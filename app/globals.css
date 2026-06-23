@@ -6,40 +6,41 @@
 
   --radius: 0.75rem;
 
-  --background: oklch(0.995 0 0);
-  --foreground: oklch(0.18 0.01 260);
+  --background: oklch(0.96 0.012 75);
+  --foreground: oklch(0.22 0.015 260);
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.01 260);
+  --card: oklch(0.99 0.006 75);
+  --card-foreground: oklch(0.22 0.015 260);
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.01 260);
+  --popover: oklch(0.99 0.006 75);
+  --popover-foreground: oklch(0.22 0.015 260);
 
-  --primary: oklch(0.45 0.15 var(--accent-hue));
-  --primary-foreground: oklch(0.99 0 0);
+  --primary: oklch(0.40 0.16 var(--accent-hue));
+  --primary-foreground: oklch(0.99 0.006 75);
 
-  --secondary: oklch(0.97 0.005 260);
-  --secondary-foreground: oklch(0.25 0.01 260);
+  --secondary: oklch(0.92 0.022 75);
+  --secondary-foreground: oklch(0.28 0.02 260);
 
-  --muted: oklch(0.97 0.005 260);
-  --muted-foreground: oklch(0.50 0.012 260);
+  --muted: oklch(0.93 0.018 75);
+  --muted-foreground: oklch(0.46 0.02 260);
 
-  --accent: oklch(0.96 0.02 var(--accent-hue));
-  --accent-foreground: oklch(0.30 0.10 var(--accent-hue));
+  --accent: oklch(0.88 0.05 var(--accent-hue));
+  --accent-foreground: oklch(0.28 0.10 var(--accent-hue));
 
-  --destructive: oklch(0.58 0.22 27);
+  --destructive: oklch(0.55 0.20 27);
   --destructive-foreground: oklch(0.99 0 0);
 
-  --border: oklch(0.92 0.005 260);
-  --input: oklch(0.92 0.005 260);
-  --ring: oklch(0.55 0.12 var(--accent-hue));
+  --border: oklch(0.84 0.025 75);
+  --input: oklch(0.84 0.025 75);
+  --ring: oklch(0.50 0.14 var(--accent-hue));
 
-  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.04);
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px -8px rgba(15, 23, 42, 0.08);
+  --shadow-soft: 0 1px 2px rgba(35, 28, 15, 0.06), 0 1px 3px rgba(35, 28, 15, 0.05);
+  --shadow-card: 0 1px 2px rgba(35, 28, 15, 0.05), 0 8px 24px -8px rgba(35, 28, 15, 0.14);
 }
 
 @theme inline {
   --font-sans: var(--font-geist-sans), "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), "Georgia", serif;
   --font-mono: var(--font-geist-mono);
 
   --radius-sm: calc(var(--radius) - 4px);
@@ -73,6 +74,8 @@
 
 body {
   background-color: var(--color-background);
+  background-image: radial-gradient(circle at 1px 1px, oklch(0.22 0.015 260 / 0.05) 1px, transparent 0);
+  background-size: 24px 24px;
   color: var(--color-foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

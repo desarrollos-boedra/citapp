@@ -37,6 +37,7 @@ export default function HomeBarberia() {
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [mostrarModal, setMostrarModal] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     async function cargar() {
@@ -75,6 +76,12 @@ export default function HomeBarberia() {
     cargarSesion();
   }, []);
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   if (cargando) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -99,21 +106,27 @@ export default function HomeBarberia() {
 
   const inicial = barberia.nombre.trim().charAt(0).toUpperCase();
 
-  return (
-    <div className="min-h-screen bg-background">
+return (
+  <div className="min-h-screen overflow-x-hidden bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3.5">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+      <header
+  className={`sticky top-0 z-40 border-b transition-all duration-300 ${
+    scrolled
+      ? "border-primary/15 bg-primary/[0.07] backdrop-blur-md shadow-[var(--shadow-soft)]"
+      : "border-primary/10 bg-primary/[0.045] backdrop-blur"
+  }`}
+>
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-4 sm:px-5">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary font-serif text-base font-semibold text-primary-foreground shadow-[var(--shadow-soft)]">
               {inicial}
             </span>
-            <span className="text-sm font-semibold tracking-tight">{barberia.nombre}</span>
+            <span className="font-serif text-[16px] font-semibold tracking-tight">{barberia.nombre}</span>
           </div>
 
           {usuario ? (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">
+              <span className="hidden text-sm text-muted-foreground sm:inline">
                 Hola, <span className="font-medium text-foreground">{usuario.nombre.split(" ")[0]}</span>
               </span>
               <button
@@ -121,71 +134,96 @@ export default function HomeBarberia() {
                   await signOut({ redirect: false });
                   setUsuario(null);
                 }}
-                className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground shadow-soft transition hover:bg-secondary hover:text-foreground"
+                className="rounded-md border border-border bg-transparent px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:border-primary/30 hover:bg-secondary hover:text-foreground"
               >
                 Salir
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/${slug}/login`}
-                className="rounded-md border border-border bg-background px-3.5 py-1.5 text-sm font-medium shadow-soft transition hover:bg-secondary"
-              >
-                Entrar
-              </Link>
-              <Link
-                href={`/${slug}/registro`}
-                className="rounded-md bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90"
-              >
-                Registro
-              </Link>
-            </div>
+           <div className="flex items-center gap-1.5 shrink-0 sm:gap-2">
+  <Link
+    href={`/${slug}/login`}
+    className="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-[13px] font-medium transition hover:border-primary/30 hover:bg-secondary sm:px-3.5 sm:text-sm"
+  >
+    Entrar
+  </Link>
+  <Link
+    href={`/${slug}/registro`}
+    className="rounded-md bg-primary px-2.5 py-1.5 text-[13px] font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition hover:opacity-90 sm:px-3.5 sm:text-sm"
+  >
+    Registro
+  </Link>
+</div>
           )}
         </div>
       </header>
 
       {/* Hero */}
-      <main className="mx-auto max-w-5xl px-5">
-        <section className="py-16 text-center sm:py-20">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{barberia.nombre}</h1>
-          <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-            Reserva tu cita online en segundos.
+      <main className="mx-auto max-w-5xl px-5 overflow-x-hidden">
+  <section className="relative py-20 text-center sm:py-28">
+          <div
+  aria-hidden
+  className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.14] blur-[100px]"
+/>
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-accent px-3.5 py-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-foreground">
+              Reserva online
+            </span>
+          </div>
+
+          <h1 className="font-serif text-5xl font-semibold tracking-tight sm:text-6xl">
+            {barberia.nombre}
+          </h1>
+          <div className="mx-auto mt-4 h-px w-14 bg-primary/40" />
+          <p className="mx-auto mt-5 max-w-md text-[15px] leading-relaxed text-muted-foreground">
+            Reserva tu cita en segundos, sin llamadas ni esperas.
           </p>
 
           <button
             onClick={() => (usuario ? router.push(`/${slug}/reservar`) : setMostrarModal(true))}
-            className="mt-8 inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-card transition hover:opacity-90"
+            className="group mt-10 inline-flex items-center gap-2 rounded-md bg-primary px-8 py-4 text-sm font-medium text-primary-foreground shadow-[0_8px_30px_-6px_oklch(0.40_0.16_222_/_0.45)] transition hover:-translate-y-1 hover:shadow-[0_14px_40px_-8px_oklch(0.40_0.16_222_/_0.55)]"
           >
             Reservar cita
-            <span aria-hidden>→</span>
+            <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-0.5">
+              →
+            </span>
           </button>
         </section>
 
         {/* Servicios */}
         {servicios.length > 0 && (
-          <section className="mx-auto max-w-2xl pb-20">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Servicios
-            </h2>
-            <div className="space-y-2.5">
-              {servicios.map((s) => (
+          <section className="mx-auto max-w-2xl pb-24">
+            <div className="mb-5 flex items-center gap-3">
+              <h2 className="font-serif text-[13px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Servicios
+              </h2>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_8px_-2px_rgba(35,28,15,0.08),0_20px_44px_-16px_rgba(35,28,15,0.18)]">
+              {servicios.map((s, i) => (
                 <div
                   key={s.id}
-                  className="flex items-center gap-4 rounded-xl border border-border bg-card px-4 py-3.5 shadow-soft transition hover:border-ring/40"
+                  className={`flex items-center gap-4 px-5 py-4 transition-colors hover:bg-secondary/50 ${
+                    i !== 0 ? "border-t border-border" : ""
+                  }`}
                 >
-                  {s.icono && <span className="text-xl">{s.icono}</span>}
+                  {s.icono && (
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent text-base">
+                      {s.icono}
+                    </span>
+                  )}
                   <div className="flex-1">
                     <div className="text-sm font-semibold">{s.nombre}</div>
                     {s.descripcion ? (
-                      <div className="text-xs text-muted-foreground">{s.descripcion}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{s.descripcion}</div>
                     ) : (
-                      <div className="text-xs text-muted-foreground">{s.duracion_min} min</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{s.duracion_min} min</div>
                     )}
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-primary">{s.precio}€</div>
-                    <div className="text-xs text-muted-foreground">{s.duracion_min} min</div>
+                    <div className="font-serif text-lg font-semibold tabular-nums text-primary">{s.precio}€</div>
+                    <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">{s.duracion_min} min</div>
                   </div>
                 </div>
               ))}
@@ -198,24 +236,24 @@ export default function HomeBarberia() {
       {mostrarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
-            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
+            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
             onClick={() => setMostrarModal(false)}
           />
-          <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-card">
-            <h3 className="text-lg font-semibold tracking-tight">Inicia sesión para reservar</h3>
+          <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+            <h3 className="font-serif text-lg font-semibold tracking-tight">Inicia sesión para reservar</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               Necesitas una cuenta para gestionar tus citas.
             </p>
             <div className="mt-6 space-y-2">
               <button
                 onClick={() => router.push(`/${slug}/login?redirect=/${slug}/reservar`)}
-                className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90"
+                className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition hover:opacity-90"
               >
                 Iniciar sesión
               </button>
               <button
                 onClick={() => router.push(`/${slug}/registro`)}
-                className="w-full rounded-md border border-border bg-background px-4 py-2.5 text-sm font-medium shadow-soft transition hover:bg-secondary"
+                className="w-full rounded-md border border-border bg-transparent px-4 py-2.5 text-sm font-medium transition hover:bg-secondary"
               >
                 Crear cuenta
               </button>

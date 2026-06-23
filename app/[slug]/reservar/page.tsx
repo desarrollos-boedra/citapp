@@ -202,8 +202,8 @@ export default function ReservarPage() {
 
   if (cargandoSesion) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <svg className="animate-spin h-6 w-6 text-purple-500" fill="none" viewBox="0 0 24 24">
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <svg className="h-6 w-6 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -213,18 +213,18 @@ export default function ReservarPage() {
 
   if (exito) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-6">
-        <div className="text-center max-w-sm w-full">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-3xl">
+      <div className="flex min-h-screen items-center justify-center bg-background px-5">
+        <div className="w-full max-w-sm text-center">
+          <div className="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-full bg-primary text-2xl text-primary-foreground">
             ✓
           </div>
-          <h2 className="text-white text-2xl font-bold mb-3">¡Reserva confirmada!</h2>
-          <p className="text-zinc-400 text-sm leading-relaxed mb-8">
+          <h2 className="text-2xl font-semibold tracking-tight">¡Reserva confirmada!</h2>
+          <p className="mx-auto mt-2 mb-8 max-w-xs text-sm text-muted-foreground">
             Tu cita ha sido registrada correctamente.
           </p>
           <Link
             href={`/${slug}`}
-            className="block w-full bg-gradient-to-br from-purple-400 to-purple-600 text-zinc-950 font-bold py-3.5 rounded-[14px] text-sm"
+            className="block w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90"
           >
             Volver al inicio
           </Link>
@@ -234,32 +234,52 @@ export default function ReservarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      <nav className="flex items-center px-6 py-4 border-b border-white/5">
-        <Link href={`/${slug}`} className="text-zinc-400 text-sm">
-          ← Volver
-        </Link>
-      </nav>
-
-      <div className="flex items-center justify-center px-6 py-5 gap-2">
-        {PASOS.map((p, i) => (
-          <div
-            key={p}
-            className={`text-[11px] font-semibold px-3 py-1 rounded-full ${
-              i === paso ? "bg-purple-500/20 text-purple-300" : "text-zinc-600"
-            }`}
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
+        <div className="mx-auto flex max-w-lg items-center px-5 py-3.5">
+          <Link
+            href={`/${slug}`}
+            className="text-sm text-muted-foreground transition hover:text-foreground"
           >
-            {p}
+            ← Volver
+          </Link>
+        </div>
+      </header>
+
+      {/* Stepper de círculos */}
+      <div className="mx-auto flex max-w-xs items-center justify-between px-5 py-6">
+        {PASOS.map((p, i) => (
+          <div key={p} className="flex flex-1 items-center last:flex-none">
+            <div className="flex flex-col items-center gap-1.5">
+              <div
+                className={`grid h-8 w-8 place-items-center rounded-full text-sm font-semibold transition ${
+                  i <= paso
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border bg-card text-muted-foreground"
+                }`}
+              >
+                {i + 1}
+              </div>
+            </div>
+            {i < PASOS.length - 1 && (
+              <div
+                className={`mx-1 h-px flex-1 transition ${i < paso ? "bg-primary" : "bg-border"}`}
+              />
+            )}
           </div>
         ))}
       </div>
 
-      <main className="px-6 pb-10 max-w-lg mx-auto">
+      <main className="mx-auto max-w-lg px-5 pb-12">
+        {/* PASO 0: Servicio */}
         {paso === 0 && (
           <div>
-            <h2 className="text-white text-2xl font-bold mb-1">¿Qué necesitas?</h2>
-            <p className="text-zinc-500 text-sm mb-6">Elige el servicio que quieres</p>
-            <div className="grid grid-cols-2 gap-3">
+            <h2 className="text-xl font-semibold tracking-tight">Elige un servicio</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Selecciona el servicio que quieres reservar.
+            </p>
+            <div className="mt-6 space-y-3">
               {servicios.map((s) => (
                 <button
                   key={s.id}
@@ -267,30 +287,40 @@ export default function ReservarPage() {
                     setServicio(s);
                     setPaso(1);
                   }}
-                  className="p-4 rounded-[16px] border border-white/[0.07] bg-white/[0.025] text-left hover:border-purple-500/30 transition-all duration-200"
+                  className="w-full rounded-xl border border-border bg-card p-4 text-left shadow-soft transition hover:border-ring/40"
                 >
-                  {s.icono && <div className="text-2xl mb-2">{s.icono}</div>}
-                  <div className="text-white text-sm font-semibold mb-1">{s.nombre}</div>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-purple-400 font-bold">{s.precio}€</span>
-                    <span className="text-zinc-600 text-[11px]">{s.duracion_min}min</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      {s.icono && <span className="text-xl">{s.icono}</span>}
+                      <span className="font-semibold">{s.nombre}</span>
+                    </div>
+                    <span className="shrink-0 font-semibold text-primary">{s.precio} €</span>
                   </div>
+                  {s.descripcion && (
+                    <p className="mt-2 text-sm text-muted-foreground">{s.descripcion}</p>
+                  )}
+                  <p className="mt-3 text-xs text-muted-foreground">{s.duracion_min} min</p>
                 </button>
               ))}
             </div>
           </div>
         )}
 
+        {/* PASO 1: Fecha y hora */}
         {paso === 1 && (
           <div>
-            <button onClick={() => setPaso(0)} className="text-zinc-500 text-sm mb-5">
+            <button
+              onClick={() => setPaso(0)}
+              className="mb-5 text-sm text-muted-foreground transition hover:text-foreground"
+            >
               ← Volver
             </button>
-            <h2 className="text-white text-2xl font-bold mb-1">¿Qué día y hora?</h2>
-            <p className="text-zinc-500 text-sm mb-6">Selecciona el día y tu horario</p>
+            <h2 className="text-xl font-semibold tracking-tight">¿Qué día y hora?</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Selecciona el día y tu horario.</p>
 
-            <div className="bg-white/[0.025] border border-white/[0.07] rounded-[20px] p-4 mb-6">
-              <div className="flex items-center justify-between mb-4">
+            {/* Calendario */}
+            <div className="mt-6 rounded-2xl border border-border bg-card p-4 shadow-soft">
+              <div className="mb-4 flex items-center justify-between">
                 <button
                   onClick={() =>
                     setMesVista((p) => {
@@ -298,11 +328,11 @@ export default function ReservarPage() {
                       return { year: d.getFullYear(), month: d.getMonth() };
                     })
                   }
-                  className="w-8 h-8 rounded-full bg-white/5 border border-white/10 text-zinc-400"
+                  className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background text-muted-foreground transition hover:bg-secondary"
                 >
                   ‹
                 </button>
-                <span className="text-white text-sm font-semibold capitalize">
+                <span className="text-sm font-semibold capitalize">
                   {new Date(mesVista.year, mesVista.month).toLocaleDateString("es-ES", {
                     month: "long",
                     year: "numeric",
@@ -315,14 +345,14 @@ export default function ReservarPage() {
                       return { year: d.getFullYear(), month: d.getMonth() };
                     })
                   }
-                  className="w-8 h-8 rounded-full bg-white/5 border border-white/10 text-zinc-400"
+                  className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background text-muted-foreground transition hover:bg-secondary"
                 >
                   ›
                 </button>
               </div>
-              <div className="grid grid-cols-7 mb-1">
+              <div className="mb-1 grid grid-cols-7">
                 {["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"].map((d) => (
-                  <div key={d} className="text-center text-[10px] text-zinc-600 font-semibold py-1">
+                  <div key={d} className="py-1 text-center text-[10px] font-semibold text-muted-foreground">
                     {d}
                   </div>
                 ))}
@@ -343,12 +373,12 @@ export default function ReservarPage() {
                         setDiaSeleccionado(d);
                         cargarHorarios(d);
                       }}
-                      className={`aspect-square rounded-[8px] text-[12px] font-semibold ${
+                      className={`aspect-square rounded-lg text-sm font-semibold transition ${
                         esPasado
-                          ? "text-zinc-700 cursor-not-allowed"
+                          ? "cursor-not-allowed text-muted-foreground/40"
                           : seleccionado
-                            ? "bg-purple-500 text-zinc-950"
-                            : "text-zinc-400 hover:bg-white/5"
+                            ? "bg-primary text-primary-foreground"
+                            : "text-foreground hover:bg-secondary"
                       }`}
                     >
                       {d.getDate()}
@@ -358,21 +388,22 @@ export default function ReservarPage() {
               </div>
             </div>
 
+            {/* Horas */}
             {diaSeleccionado && (
-              <div className="mb-6">
-                <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-3">
+              <div className="mt-6">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   Hora disponible
                 </p>
                 {cargandoHoras ? (
                   <div className="flex justify-center py-8">
-                    <svg className="animate-spin h-5 w-5 text-purple-500" fill="none" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
                   </div>
                 ) : horasDisponibles.length === 0 ? (
-                  <div className="text-center py-8 bg-white/[0.02] border border-white/[0.06] rounded-2xl">
-                    <p className="text-zinc-500 text-sm">No hay horas disponibles</p>
+                  <div className="rounded-2xl border border-border bg-card py-8 text-center">
+                    <p className="text-sm text-muted-foreground">No hay horas disponibles</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-4 gap-2">
@@ -381,12 +412,12 @@ export default function ReservarPage() {
                         key={hora}
                         disabled={ocupada}
                         onClick={() => setHoraSeleccionada(hora)}
-                        className={`py-2.5 rounded-[12px] border text-[13px] font-medium ${
+                        className={`rounded-lg border py-2.5 text-sm font-medium transition ${
                           ocupada
-                            ? "border-white/[0.04] bg-white/[0.02] text-zinc-700 cursor-not-allowed"
+                            ? "cursor-not-allowed border-border bg-muted text-muted-foreground/40"
                             : horaSeleccionada === hora
-                              ? "border-purple-500 bg-purple-500/15 text-purple-300"
-                              : "border-white/[0.07] bg-white/[0.025] text-zinc-300"
+                              ? "border-primary bg-accent text-accent-foreground"
+                              : "border-border bg-card text-foreground hover:border-ring/40"
                         }`}
                       >
                         {hora}
@@ -400,55 +431,75 @@ export default function ReservarPage() {
             <button
               onClick={() => diaSeleccionado && horaSeleccionada && setPaso(2)}
               disabled={!diaSeleccionado || !horaSeleccionada}
-              className="w-full bg-gradient-to-br from-purple-400 to-purple-600 disabled:opacity-30 text-zinc-950 font-bold py-4 rounded-[14px]"
+              className="mt-6 w-full rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Continuar
             </button>
           </div>
         )}
 
+        {/* PASO 2: Confirmar */}
         {paso === 2 && (
           <div>
-            <button onClick={() => setPaso(1)} className="text-zinc-500 text-sm mb-5">
-              ← Volver
-            </button>
-            <h2 className="text-white text-2xl font-bold mb-1">Confirmar reserva</h2>
-            <p className="text-zinc-500 text-sm mb-6">Revisa los detalles antes de confirmar</p>
+            <h2 className="text-xl font-semibold tracking-tight">Confirma tu reserva</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Revisa los detalles antes de confirmar.
+            </p>
 
-            <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl px-6 py-4 space-y-3 mb-6">
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Servicio</span>
-                <span className="text-white">{servicio?.nombre}</span>
+            <div className="mt-6 space-y-2.5">
+              <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 shadow-soft">
+                <span className="text-sm text-muted-foreground">Servicio</span>
+                <span className="text-sm font-medium">{servicio?.nombre}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Día</span>
-                <span className="text-white">
-                  {diaSeleccionado?.toLocaleDateString("es-ES", { day: "numeric", month: "long" })}
+
+              <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 shadow-soft">
+                <span className="text-sm text-muted-foreground">Duración</span>
+                <span className="text-sm font-medium">{servicio?.duracion_min} min</span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 shadow-soft">
+                <span className="text-sm text-muted-foreground">Día</span>
+                <span className="text-sm font-medium capitalize">
+                  {diaSeleccionado?.toLocaleDateString("es-ES", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Hora</span>
-                <span className="text-white">{horaSeleccionada}</span>
+
+              <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 shadow-soft">
+                <span className="text-sm text-muted-foreground">Hora</span>
+                <span className="text-sm font-medium">{horaSeleccionada}</span>
               </div>
-              <div className="pt-3 border-t border-white/5 flex justify-between">
-                <span className="text-zinc-400 font-semibold">Total</span>
-                <span className="text-purple-400 font-bold text-lg">{servicio?.precio}€</span>
+
+              <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4 shadow-soft">
+                <span className="text-sm font-semibold">Total</span>
+                <span className="text-lg font-bold text-primary">{servicio?.precio} €</span>
               </div>
             </div>
 
             {error && (
-              <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-4">
+              <div className="mt-4 rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             )}
 
-            <button
-              onClick={confirmarReserva}
-              disabled={loading}
-              className="w-full bg-gradient-to-br from-purple-400 to-purple-600 disabled:opacity-50 text-zinc-950 font-bold py-4 rounded-[14px]"
-            >
-              {loading ? "Confirmando..." : "Confirmar reserva"}
-            </button>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setPaso(1)}
+                className="rounded-md border border-border bg-background px-5 py-3 text-sm font-medium shadow-soft transition hover:bg-secondary"
+              >
+                Atrás
+              </button>
+              <button
+                onClick={confirmarReserva}
+                disabled={loading}
+                className="flex-1 rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90 disabled:opacity-50"
+              >
+                {loading ? "Confirmando..." : "Confirmar reserva"}
+              </button>
+            </div>
           </div>
         )}
       </main>

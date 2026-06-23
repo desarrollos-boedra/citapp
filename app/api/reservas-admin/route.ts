@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdmin } from "@/lib/auth-guard";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const barberiaId = searchParams.get("barberia_id");
-  if (!barberiaId) {
-    return NextResponse.json({ error: "Falta barberia_id" }, { status: 400 });
-  }
+export async function GET() {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+  const barberiaId = guard.barberiaId;
 
   const supabase = supabaseAdmin();
 

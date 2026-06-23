@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 
 type Barberia = {
   id: string;
@@ -76,8 +77,8 @@ export default function HomeBarberia() {
 
   if (cargando) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <svg className="animate-spin h-6 w-6 text-purple-500" fill="none" viewBox="0 0 24 24">
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <svg className="h-6 w-6 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -87,99 +88,140 @@ export default function HomeBarberia() {
 
   if (noEncontrada || !barberia) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-6">
+      <div className="flex min-h-screen items-center justify-center bg-background px-6">
         <div className="text-center">
-          <h1 className="text-white text-xl font-bold mb-2">Barbería no encontrada</h1>
-          <p className="text-zinc-500 text-sm">Revisa que la dirección sea correcta.</p>
+          <h1 className="text-xl font-semibold tracking-tight">Negocio no encontrado</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Revisa que la dirección sea correcta.</p>
         </div>
       </div>
     );
   }
 
+  const inicial = barberia.nombre.trim().charAt(0).toUpperCase();
+
   return (
-    <div className="min-h-screen bg-zinc-950 font-sans">
-      <div className="fixed top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-purple-900 via-purple-400 to-purple-900 z-50" />
-
-      <nav className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-white/5">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-purple-600 rounded-[8px] flex items-center justify-center text-zinc-950 font-bold text-sm">
-            ✂
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-8 w-8 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+              {inicial}
+            </span>
+            <span className="text-sm font-semibold tracking-tight">{barberia.nombre}</span>
           </div>
-          <span className="font-bold text-white text-sm">{barberia.nombre}</span>
+
+          {usuario ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">
+                Hola, <span className="font-medium text-foreground">{usuario.nombre.split(" ")[0]}</span>
+              </span>
+              <button
+                onClick={async () => {
+                  await signOut({ redirect: false });
+                  setUsuario(null);
+                }}
+                className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-muted-foreground shadow-soft transition hover:bg-secondary hover:text-foreground"
+              >
+                Salir
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/${slug}/login`}
+                className="rounded-md border border-border bg-background px-3.5 py-1.5 text-sm font-medium shadow-soft transition hover:bg-secondary"
+              >
+                Entrar
+              </Link>
+              <Link
+                href={`/${slug}/registro`}
+                className="rounded-md bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90"
+              >
+                Registro
+              </Link>
+            </div>
+          )}
         </div>
-        {usuario ? (
-          <span className="text-[13px] text-zinc-300">{usuario.nombre.split(" ")[0]}</span>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/${slug}/login`}
-              className="text-[13px] text-zinc-400 hover:text-zinc-200 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-1.5 rounded-full transition-all duration-200"
-            >
-              Entrar
-            </Link>
-            <Link
-              href={`/${slug}/registro`}
-              className="text-[13px] text-zinc-950 font-semibold bg-gradient-to-br from-purple-400 to-purple-600 px-4 py-1.5 rounded-full transition-all duration-200"
-            >
-              Registro
-            </Link>
-          </div>
-        )}
-      </nav>
+      </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-16 text-center">
-        <h1 className="text-white text-4xl font-bold mb-3">{barberia.nombre}</h1>
-        <p className="text-zinc-400 mb-8">Reserva tu cita online en segundos.</p>
+      {/* Hero */}
+      <main className="mx-auto max-w-5xl px-5">
+        <section className="py-16 text-center sm:py-20">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{barberia.nombre}</h1>
+          <p className="mx-auto mt-3 max-w-md text-muted-foreground">
+            Reserva tu cita online en segundos.
+          </p>
 
-        <button
-          onClick={() =>
-            usuario ? router.push(`/${slug}/reservar`) : setMostrarModal(true)
-          }
-          className="bg-gradient-to-br from-purple-400 to-purple-600 text-zinc-950 font-bold py-4 px-8 rounded-2xl text-[15px] shadow-[0_8px_32px_rgba(168,85,247,0.3)] hover:-translate-y-0.5 transition-all duration-200"
-        >
-          Reservar cita →
-        </button>
+          <button
+            onClick={() => (usuario ? router.push(`/${slug}/reservar`) : setMostrarModal(true))}
+            className="mt-8 inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-card transition hover:opacity-90"
+          >
+            Reservar cita
+            <span aria-hidden>→</span>
+          </button>
+        </section>
 
+        {/* Servicios */}
         {servicios.length > 0 && (
-          <div className="mt-16 text-left">
-            <h2 className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-4">
+          <section className="mx-auto max-w-2xl pb-20">
+            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Servicios
             </h2>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {servicios.map((s) => (
                 <div
                   key={s.id}
-                  className="flex items-center gap-4 bg-white/[0.025] border border-white/[0.06] rounded-[14px] px-4 py-3.5"
+                  className="flex items-center gap-4 rounded-xl border border-border bg-card px-4 py-3.5 shadow-soft transition hover:border-ring/40"
                 >
                   {s.icono && <span className="text-xl">{s.icono}</span>}
                   <div className="flex-1">
-                    <div className="text-white text-sm font-semibold">{s.nombre}</div>
-                    <div className="text-zinc-500 text-[12px]">{s.duracion_min} min</div>
+                    <div className="text-sm font-semibold">{s.nombre}</div>
+                    {s.descripcion ? (
+                      <div className="text-xs text-muted-foreground">{s.descripcion}</div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">{s.duracion_min} min</div>
+                    )}
                   </div>
-                  <div className="text-purple-400 font-bold">{s.precio}€</div>
+                  <div className="text-right">
+                    <div className="font-semibold text-primary">{s.precio}€</div>
+                    <div className="text-xs text-muted-foreground">{s.duracion_min} min</div>
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
       </main>
 
+      {/* Modal: iniciar sesión para reservar */}
       {mostrarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMostrarModal(false)} />
-          <div className="relative w-full max-w-sm bg-zinc-900 border border-white/10 rounded-2xl p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-1">Inicia sesión para reservar</h3>
-            <p className="text-zinc-500 text-sm mb-6">Necesitas una cuenta para gestionar tus citas</p>
-            <div className="space-y-2">
+          <div
+            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
+            onClick={() => setMostrarModal(false)}
+          />
+          <div className="relative w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-card">
+            <h3 className="text-lg font-semibold tracking-tight">Inicia sesión para reservar</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Necesitas una cuenta para gestionar tus citas.
+            </p>
+            <div className="mt-6 space-y-2">
               <button
                 onClick={() => router.push(`/${slug}/login?redirect=/${slug}/reservar`)}
-                className="w-full p-4 rounded-[16px] border border-purple-500/20 bg-purple-500/5 hover:border-purple-500/40 transition-all duration-200 text-left"
+                className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90"
               >
-                <div className="text-white text-sm font-semibold">Iniciar sesión</div>
+                Iniciar sesión
+              </button>
+              <button
+                onClick={() => router.push(`/${slug}/registro`)}
+                className="w-full rounded-md border border-border bg-background px-4 py-2.5 text-sm font-medium shadow-soft transition hover:bg-secondary"
+              >
+                Crear cuenta
               </button>
               <button
                 onClick={() => setMostrarModal(false)}
-                className="w-full mt-2 text-zinc-600 text-sm hover:text-zinc-400 transition-colors py-2"
+                className="w-full py-2 text-sm text-muted-foreground transition hover:text-foreground"
               >
                 Cancelar
               </button>

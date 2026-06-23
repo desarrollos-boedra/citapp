@@ -1,34 +1,30 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireUser } from "@/lib/auth-guard";
 
 export async function POST(request: Request) {
+  // El cliente debe estar logueado para reservar
+  const guard = await requireUser();
+  if (!guard.ok) return guard.response;
+
   const body = await request.json();
   const supabase = supabaseAdmin();
-  const { data, error } = await supabase.from("reservas").insert(body).select().single();
+
+  // usuario_id y barberia_id salen del TOKEN, no del body.
+  // Así un usuario no puede crear reservas en nombre de otro ni en otra barbería.
+  const { data, error } = await supabase
+    .from("reservas")
+    .insert({
+      usuario_id: guard.userId,
+      barberia_id: guard.barberiaId,
+      servicio_id: body.servicio_id,
+      fecha_hora: body.fecha_hora,
+      estado: "confirmada",
+      notas: body.notas ?? null,
+    })
+    .select()
+    .single();
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
-}
-
-export async function PATCH(request: Request) {
-  const body = await request.json();
-
-  const supabase = supabaseAdmin();
-
-  // Actualización masiva por filtros (ej: marcar como completadas las pasadas)
-  if (body.filtro_estado && body.filtro_barberia && body.filtro_fecha) {
-    const { error } = await supabase
-      .from("reservas")
-      .update({ estado: body.estado })
-      .eq("estado", body.filtro_estado)
-      .eq("barberia_id", body.filtro_barberia)
-      .lt("fecha_hora", body.filtro_fecha);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true });
-  }
-
-  // Actualización individual por id
-  const { id, ...resto } = body;
-  const { error } = await supabase.from("reservas").update(resto).eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
 }

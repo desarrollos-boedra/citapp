@@ -12,7 +12,16 @@ type Servicio = {
   icono: string | null;
 };
 
+type FranjaHorario = { dia_semana: number; hora_inicio: string; hora_fin: string };
+type Excepcion = {
+  fecha: string;
+  cerrado: boolean;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+};
+
 const PASOS = ["Servicio", "Fecha", "Confirmar"];
+const INTERVALO_MIN = 15; // huecos cada 15 minutos
 
 function getDiasDelMes(year: number, month: number) {
   const ultimoDia = new Date(year, month + 1, 0);
@@ -28,22 +37,30 @@ function fechaStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// Horario simple: mañana 09:00-14:00, tarde 16:00-20:00, igual todos los días.
-// El plan básico no soporta variación de horario por día de la semana.
-function generarSlots(turno: string): string[] {
+// "HH:MM" -> minutos desde medianoche
+function aMinutos(hhmm: string): number {
+  const [h, m] = hhmm.substring(0, 5).split(":").map(Number);
+  return h * 60 + m;
+}
+
+// minutos -> "HH:MM"
+function aHora(min: number): string {
+  const hh = String(Math.floor(min / 60)).padStart(2, "0");
+  const mm = String(min % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+// Día de la semana (0=lunes..6=domingo) de un Date
+function diaSemana(d: Date): number {
+  return (d.getDay() + 6) % 7;
+}
+
+// Genera puntos de inicio (cada INTERVALO_MIN) dentro de una franja,
+// asegurando que un servicio de `duracion` minutos cabe antes del fin.
+function generarSlotsDeFranja(inicioMin: number, finMin: number, duracion: number): string[] {
   const slots: string[] = [];
-  const rangos =
-    turno === "manana"
-      ? [[9 * 60, 14 * 60]]
-      : turno === "tarde"
-        ? [[16 * 60, 20 * 60]]
-        : [];
-  for (const [inicio, fin] of rangos) {
-    for (let min = inicio; min <= fin; min += 15) {
-      const hh = String(Math.floor(min / 60)).padStart(2, "0");
-      const mm = String(min % 60).padStart(2, "0");
-      slots.push(`${hh}:${mm}`);
-    }
+  for (let min = inicioMin; min + duracion <= finMin; min += INTERVALO_MIN) {
+    slots.push(aHora(min));
   }
   return slots;
 }
@@ -60,6 +77,11 @@ export default function ReservarPage() {
   const [paso, setPaso] = useState(0);
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [servicio, setServicio] = useState<Servicio | null>(null);
+
+  // Horarios del negocio (se cargan una vez)
+  const [horarioSemanal, setHorarioSemanal] = useState<FranjaHorario[]>([]);
+  const [excepciones, setExcepciones] = useState<Excepcion[]>([]);
+
   const [diaSeleccionado, setDiaSeleccionado] = useState<Date | null>(null);
   const [horasDisponibles, setHorasDisponibles] = useState<{ hora: string; ocupada: boolean }[]>([]);
   const [horaSeleccionada, setHoraSeleccionada] = useState<string | null>(null);
@@ -98,13 +120,44 @@ export default function ReservarPage() {
     comprobarSesion();
   }, [slug, router]);
 
-  // Cargar servicios de la barbería
+  // Cargar servicios + horario semanal + excepciones de la barbería
   useEffect(() => {
     if (!barberiaId) return;
     fetch(`/api/servicios?barberia_id=${barberiaId}`)
       .then((r) => r.json())
       .then((data) => setServicios(data));
+
+    fetch(`/api/horario-semanal?barberia_id=${barberiaId}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setHorarioSemanal(data));
+
+    fetch(`/api/excepciones?barberia_id=${barberiaId}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setExcepciones(data));
   }, [barberiaId]);
+
+  // Devuelve las franjas [inicioMin, finMin] que aplican a una fecha concreta,
+  // teniendo en cuenta excepciones (que tienen prioridad) y, si no, el horario semanal.
+  function franjasDeFecha(dia: Date): [number, number][] {
+    const fecha = fechaStr(dia);
+
+    // 1. ¿Hay excepción para esta fecha?
+    const excDia = excepciones.filter((e) => e.fecha === fecha);
+    if (excDia.length > 0) {
+      // Si alguna marca cerrado, el día está cerrado
+      if (excDia.some((e) => e.cerrado)) return [];
+      // Si no, usar las franjas de la excepción
+      return excDia
+        .filter((e) => e.hora_inicio && e.hora_fin)
+        .map((e) => [aMinutos(e.hora_inicio as string), aMinutos(e.hora_fin as string)] as [number, number]);
+    }
+
+    // 2. Sin excepción: usar el horario semanal del día de la semana
+    const ds = diaSemana(dia);
+    return horarioSemanal
+      .filter((f) => f.dia_semana === ds)
+      .map((f) => [aMinutos(f.hora_inicio), aMinutos(f.hora_fin)] as [number, number]);
+  }
 
   async function cargarHorarios(dia: Date) {
     if (!barberiaId) return;
@@ -113,20 +166,22 @@ export default function ReservarPage() {
     setHorasDisponibles([]);
 
     const fecha = fechaStr(dia);
+    const duracionServicio = servicio?.duracion_min ?? 30;
 
-    const resAgenda = await fetch(`/api/agenda?barberia_id=${barberiaId}`);
-    const agendaTodas: { fecha: string; turno: string }[] = await resAgenda.json();
-    const turnos = agendaTodas.filter((a) => a.fecha === fecha).map((a) => a.turno);
+    // Franjas de apertura de ese día (semanal o excepción)
+    const franjas = franjasDeFecha(dia);
 
-    if (turnos.length === 0 || turnos.includes("cerrado")) {
+    if (franjas.length === 0) {
       setHorasDisponibles([]);
       setCargandoHoras(false);
       return;
     }
 
+    // Generar todos los slots posibles donde el servicio cabe
     let slots: string[] = [];
-    if (turnos.includes("manana")) slots = [...slots, ...generarSlots("manana")];
-    if (turnos.includes("tarde")) slots = [...slots, ...generarSlots("tarde")];
+    for (const [ini, fin] of franjas) {
+      slots = [...slots, ...generarSlotsDeFranja(ini, fin, duracionServicio)];
+    }
 
     // Reservas existentes ese día, para marcar ocupadas
     const resReservas = await fetch(
@@ -136,16 +191,11 @@ export default function ReservarPage() {
       ? await resReservas.json()
       : [];
 
-    const duracionServicio = servicio?.duracion_min ?? 30;
-
     const ocupado = (slot: string) => {
-      const [sh, sm] = slot.split(":").map(Number);
-      const slotMin = sh * 60 + sm;
+      const slotMin = aMinutos(slot);
       const slotFinMin = slotMin + duracionServicio;
       for (const r of reservasDia) {
-        const horaR = r.fecha_hora.substring(11, 16);
-        const [rh, rm] = horaR.split(":").map(Number);
-        const rMin = rh * 60 + rm;
+        const rMin = aMinutos(r.fecha_hora.substring(11, 16));
         const rFinMin = rMin + (r.duracion_min ?? 30);
         if (slotMin < rFinMin && slotFinMin > rMin) return true;
       }
@@ -154,14 +204,13 @@ export default function ReservarPage() {
 
     const ahora = new Date();
     const esHoy = fechaStr(ahora) === fecha;
+    const ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
 
     setHorasDisponibles(
       slots
         .filter((h) => {
-          if (esHoy) {
-            const [hh, mm] = h.split(":").map(Number);
-            if (hh * 60 + mm <= ahora.getHours() * 60 + ahora.getMinutes()) return false;
-          }
+          // Si es hoy, descartar horas ya pasadas
+          if (esHoy && aMinutos(h) <= ahoraMin) return false;
           return true;
         })
         .map((h) => ({ hora: h, ocupada: ocupado(h) })),
@@ -181,11 +230,8 @@ export default function ReservarPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        usuario_id: usuario.id,
         servicio_id: servicio.id,
-        barberia_id: barberiaId,
         fecha_hora: fechaHoraStr,
-        estado: "confirmada",
         notas: `Cliente: ${usuario.nombre}.`,
       }),
     });

@@ -15,14 +15,18 @@ export async function GET(request: Request) {
     .from("excepciones")
     .select("id, fecha, cerrado, hora_inicio, hora_fin")
     .eq("barberia_id", barberiaId)
-    .order("fecha");
+    .order("fecha")
+    .order("hora_inicio");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);
 }
 
-// POST: solo admin. Crea una excepción para un día concreto.
-// { fecha, cerrado, hora_inicio?, hora_fin? }
+// POST: solo admin. Guarda la excepción de UNA fecha concreta.
+// Estrategia "reemplazar": borra lo que hubiera para esa fecha y mete lo nuevo.
+// Body:
+//   { fecha, cerrado: true }                              -> día cerrado
+//   { fecha, cerrado: false, franjas: [{inicio, fin}, ...] } -> horario especial (1 o 2 franjas)
 export async function POST(request: Request) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
@@ -33,50 +37,71 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Falta la fecha" }, { status: 400 });
   }
 
-  // Si no está cerrado, debe traer horas válidas
-  if (!body.cerrado) {
-    if (!body.hora_inicio || !body.hora_fin || body.hora_fin <= body.hora_inicio) {
-      return NextResponse.json(
-        { error: "Si el día abre, indica una hora de inicio y fin válidas." },
-        { status: 400 },
-      );
-    }
-  }
-
   const supabase = supabaseAdmin();
-  const { data, error } = await supabase
+
+  // 1. Borrar cualquier excepción previa de esa fecha (reemplazo limpio)
+  const { error: delError } = await supabase
     .from("excepciones")
-    .insert({
+    .delete()
+    .eq("barberia_id", barberiaId)
+    .eq("fecha", body.fecha);
+  if (delError) return NextResponse.json({ error: delError.message }, { status: 500 });
+
+  // 2a. Día cerrado: una sola fila con cerrado=true, sin horas
+  if (body.cerrado) {
+    const { error } = await supabase.from("excepciones").insert({
       barberia_id: barberiaId,
       fecha: body.fecha,
-      cerrado: !!body.cerrado,
-      hora_inicio: body.cerrado ? null : body.hora_inicio,
-      hora_fin: body.cerrado ? null : body.hora_fin,
-    })
-    .select()
-    .single();
+      cerrado: true,
+      hora_inicio: null,
+      hora_fin: null,
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
 
+  // 2b. Horario especial: una fila por cada franja
+  const franjas: { inicio: string; fin: string }[] = body.franjas ?? [];
+  const franjasValidas = franjas.filter((f) => f.inicio && f.fin && f.fin > f.inicio);
+
+  if (franjasValidas.length === 0) {
+    return NextResponse.json(
+      { error: "Indica al menos una franja válida (hora de fin mayor que la de inicio)." },
+      { status: 400 },
+    );
+  }
+
+  const filas = franjasValidas.map((f) => ({
+    barberia_id: barberiaId,
+    fecha: body.fecha,
+    cerrado: false,
+    hora_inicio: f.inicio,
+    hora_fin: f.fin,
+  }));
+
+  const { error } = await supabase.from("excepciones").insert(filas);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  return NextResponse.json({ ok: true });
 }
 
-// DELETE: solo admin. Borra una excepción por id (solo de su barbería).
+// DELETE: solo admin. Borra TODAS las excepciones de una fecha concreta.
+// Body: { fecha }
 export async function DELETE(request: Request) {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
   const barberiaId = guard.barberiaId;
 
   const body = await request.json();
-  if (!body.id) {
-    return NextResponse.json({ error: "Falta id" }, { status: 400 });
+  if (!body.fecha) {
+    return NextResponse.json({ error: "Falta la fecha" }, { status: 400 });
   }
 
   const supabase = supabaseAdmin();
   const { error } = await supabase
     .from("excepciones")
     .delete()
-    .eq("id", body.id)
-    .eq("barberia_id", barberiaId);
+    .eq("barberia_id", barberiaId)
+    .eq("fecha", body.fecha);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

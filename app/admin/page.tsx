@@ -47,6 +47,13 @@ function formatFecha(fecha: string) {
   return obj.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
+// Día de la semana (0=lunes..6=domingo) a partir de "YYYY-MM-DD"
+function diaSemanaDeFecha(fecha: string): number {
+  const [y, m, d] = fecha.split("-").map(Number);
+  const js = new Date(y, m - 1, d).getDay(); // 0=domingo
+  return (js + 6) % 7; // 0=lunes
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [barberiaId, setBarberiaId] = useState<string | null>(null);
@@ -59,7 +66,7 @@ export default function AdminPage() {
   const [loadingReservas, setLoadingReservas] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState("confirmada");
 
-  // Horario semanal: por cada día, una franja mañana y una tarde (opcionales)
+  // Horario semanal: por cada día, franja mañana y tarde (opcionales)
   const [horarioDias, setHorarioDias] = useState<
     { manana: { inicio: string; fin: string } | null; tarde: { inicio: string; fin: string } | null }[]
   >(() => DIAS.map(() => ({ manana: null, tarde: null })));
@@ -69,8 +76,8 @@ export default function AdminPage() {
   // Nueva excepción
   const [excFecha, setExcFecha] = useState("");
   const [excCerrado, setExcCerrado] = useState(true);
-  const [excInicio, setExcInicio] = useState("09:00");
-  const [excFin, setExcFin] = useState("14:00");
+  const [excManana, setExcManana] = useState<{ inicio: string; fin: string } | null>(null);
+  const [excTarde, setExcTarde] = useState<{ inicio: string; fin: string } | null>(null);
 
   // Servicios
   const [servicios, setServicios] = useState<Servicio[]>([]);
@@ -106,14 +113,12 @@ export default function AdminPage() {
 
   const cargarHorario = useCallback(async () => {
     if (!barberiaId) return;
-    // Horario semanal
     const resH = await fetch(`/api/horario-semanal?barberia_id=${barberiaId}`);
     const franjas: Franja[] = resH.ok ? await resH.json() : [];
     const dias = DIAS.map(() => ({
       manana: null as { inicio: string; fin: string } | null,
       tarde: null as { inicio: string; fin: string } | null,
     }));
-    // Asignar la primera franja de cada día a "mañana" y la segunda a "tarde"
     for (const f of franjas) {
       const ini = f.hora_inicio.substring(0, 5);
       const fin = f.hora_fin.substring(0, 5);
@@ -122,7 +127,6 @@ export default function AdminPage() {
     }
     setHorarioDias(dias);
 
-    // Excepciones
     const resE = await fetch(`/api/excepciones?barberia_id=${barberiaId}`);
     if (resE.ok) setExcepciones(await resE.json());
   }, [barberiaId]);
@@ -194,39 +198,76 @@ export default function AdminPage() {
     }
   }
 
+  // Cuando se elige una fecha para la excepción, pre-cargar el horario de ese día de la semana
+  function onCambiarFechaExcepcion(fecha: string) {
+    setExcFecha(fecha);
+    if (!fecha) {
+      setExcManana(null);
+      setExcTarde(null);
+      return;
+    }
+    const dia = diaSemanaDeFecha(fecha);
+    // Pre-cargar con el horario habitual de ese día de la semana
+    setExcManana(horarioDias[dia].manana ? { ...horarioDias[dia].manana! } : null);
+    setExcTarde(horarioDias[dia].tarde ? { ...horarioDias[dia].tarde! } : null);
+  }
+
+  function toggleExcTurno(turno: "manana" | "tarde") {
+    if (turno === "manana") {
+      setExcManana((prev) => (prev ? null : { inicio: "09:30", fin: "13:45" }));
+    } else {
+      setExcTarde((prev) => (prev ? null : { inicio: "16:00", fin: "20:00" }));
+    }
+  }
+
+  function setExcFranja(turno: "manana" | "tarde", campo: "inicio" | "fin", valor: string) {
+    if (turno === "manana") {
+      setExcManana((prev) => ({ ...(prev ?? { inicio: "", fin: "" }), [campo]: valor }));
+    } else {
+      setExcTarde((prev) => ({ ...(prev ?? { inicio: "", fin: "" }), [campo]: valor }));
+    }
+  }
+
   async function crearExcepcion() {
     if (!excFecha) {
       notificar("Elige una fecha", "error");
       return;
     }
+    const franjas: { inicio: string; fin: string }[] = [];
+    if (!excCerrado) {
+      if (excManana) franjas.push(excManana);
+      if (excTarde) franjas.push(excTarde);
+      if (franjas.length === 0) {
+        notificar("Activa al menos un turno o marca el día como cerrado", "error");
+        return;
+      }
+    }
     const res = await fetch("/api/excepciones", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fecha: excFecha,
-        cerrado: excCerrado,
-        hora_inicio: excCerrado ? null : excInicio,
-        hora_fin: excCerrado ? null : excFin,
-      }),
+      body: JSON.stringify({ fecha: excFecha, cerrado: excCerrado, franjas }),
     });
     if (res.ok) {
       setExcFecha("");
+      setExcManana(null);
+      setExcTarde(null);
+      setExcCerrado(true);
       await cargarHorario();
-      notificar("Excepción añadida");
+      notificar("Día especial guardado");
     } else {
       const data = await res.json();
       notificar(data.error ?? "Error", "error");
     }
   }
 
-  async function borrarExcepcion(id: string) {
-    setExcepciones((prev) => prev.filter((e) => e.id !== id));
+  async function borrarExcepcion(fecha: string) {
+    setExcepciones((prev) => prev.filter((e) => e.fecha !== fecha));
     await fetch("/api/excepciones", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ fecha }),
     });
-    notificar("Excepción eliminada");
+    notificar("Día especial eliminado");
   }
 
   // --- Servicios ---
@@ -279,6 +320,12 @@ export default function AdminPage() {
   }
 
   const reservasFiltradas = reservas.filter((r) => r.estado === filtroEstado);
+
+  // Agrupar excepciones por fecha (para mostrar varias franjas juntas)
+  const excepcionesPorFecha = excepciones.reduce<Record<string, Excepcion[]>>((acc, e) => {
+    (acc[e.fecha] ??= []).push(e);
+    return acc;
+  }, {});
 
   return (
     <div className="min-h-screen bg-background">
@@ -409,7 +456,6 @@ export default function AdminPage() {
                       )}
                     </div>
 
-                    {/* Turno mañana */}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => toggleTurno(idx, "manana")}
@@ -440,7 +486,6 @@ export default function AdminPage() {
                       )}
                     </div>
 
-                    {/* Turno tarde */}
                     <div className="mt-2 flex items-center gap-2">
                       <button
                         onClick={() => toggleTurno(idx, "tarde")}
@@ -483,11 +528,11 @@ export default function AdminPage() {
               {guardandoHorario ? "Guardando..." : "Guardar horario"}
             </button>
 
-            {/* Excepciones */}
+            {/* Días especiales */}
             <div className="mt-10">
               <h3 className="text-lg font-semibold tracking-tight">Días especiales</h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Marca un día concreto como cerrado o con un horario distinto (vacaciones, médico, festivos...).
+                Cierra un día o ponle un horario distinto. Al elegir la fecha se carga tu horario habitual de ese día para que solo lo ajustes.
               </p>
 
               <div className="mt-4 rounded-xl border border-border bg-card p-4 shadow-soft">
@@ -496,7 +541,7 @@ export default function AdminPage() {
                   <input
                     type="date"
                     value={excFecha}
-                    onChange={(e) => setExcFecha(e.target.value)}
+                    onChange={(e) => onCambiarFechaExcepcion(e.target.value)}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   />
                 </label>
@@ -525,55 +570,107 @@ export default function AdminPage() {
                 </div>
 
                 {!excCerrado && (
-                  <div className="mt-3 flex items-center gap-1.5">
-                    <input
-                      type="time"
-                      value={excInicio}
-                      onChange={(e) => setExcInicio(e.target.value)}
-                      className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                    />
-                    <span className="text-muted-foreground">–</span>
-                    <input
-                      type="time"
-                      value={excFin}
-                      onChange={(e) => setExcFin(e.target.value)}
-                      className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                    />
+                  <div className="mt-4 space-y-2">
+                    {/* Mañana */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleExcTurno("manana")}
+                        className={`w-20 shrink-0 rounded-md border px-2 py-1.5 text-xs font-medium transition ${
+                          excManana
+                            ? "border-primary bg-accent text-accent-foreground"
+                            : "border-border bg-background text-muted-foreground"
+                        }`}
+                      >
+                        Mañana
+                      </button>
+                      {excManana && (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="time"
+                            value={excManana.inicio}
+                            onChange={(e) => setExcFranja("manana", "inicio", e.target.value)}
+                            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                          />
+                          <span className="text-muted-foreground">–</span>
+                          <input
+                            type="time"
+                            value={excManana.fin}
+                            onChange={(e) => setExcFranja("manana", "fin", e.target.value)}
+                            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    {/* Tarde */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleExcTurno("tarde")}
+                        className={`w-20 shrink-0 rounded-md border px-2 py-1.5 text-xs font-medium transition ${
+                          excTarde
+                            ? "border-primary bg-accent text-accent-foreground"
+                            : "border-border bg-background text-muted-foreground"
+                        }`}
+                      >
+                        Tarde
+                      </button>
+                      {excTarde && (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="time"
+                            value={excTarde.inicio}
+                            onChange={(e) => setExcFranja("tarde", "inicio", e.target.value)}
+                            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                          />
+                          <span className="text-muted-foreground">–</span>
+                          <input
+                            type="time"
+                            value={excTarde.fin}
+                            onChange={(e) => setExcFranja("tarde", "fin", e.target.value)}
+                            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 <button
                   onClick={crearExcepcion}
-                  className="mt-3 w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90"
+                  className="mt-4 w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90"
                 >
-                  Añadir día especial
+                  Guardar día especial
                 </button>
               </div>
 
-              {/* Lista de excepciones */}
-              {excepciones.length > 0 && (
+              {/* Lista de días especiales (agrupados por fecha) */}
+              {Object.keys(excepcionesPorFecha).length > 0 && (
                 <div className="mt-4 space-y-2">
-                  {excepciones.map((e) => (
-                    <div
-                      key={e.id}
-                      className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 shadow-soft"
-                    >
-                      <div>
-                        <div className="text-sm font-medium capitalize">{formatFecha(e.fecha)}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {e.cerrado
-                            ? "Cerrado"
-                            : `Abierto ${e.hora_inicio?.substring(0, 5)} – ${e.hora_fin?.substring(0, 5)}`}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => borrarExcepcion(e.id)}
-                        className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/15"
+                  {Object.entries(excepcionesPorFecha).map(([fecha, items]) => {
+                    const cerrado = items.some((i) => i.cerrado);
+                    return (
+                      <div
+                        key={fecha}
+                        className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 shadow-soft"
                       >
-                        Quitar
-                      </button>
-                    </div>
-                  ))}
+                        <div>
+                          <div className="text-sm font-medium capitalize">{formatFecha(fecha)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {cerrado
+                              ? "Cerrado"
+                              : items
+                                  .map((i) => `${i.hora_inicio?.substring(0, 5)}–${i.hora_fin?.substring(0, 5)}`)
+                                  .join("  ·  ")}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => borrarExcepcion(fecha)}
+                          className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/15"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -614,7 +711,6 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {/* Nuevo servicio (solo si no se ha alcanzado el límite) */}
             {servicios.length < LIMITE_SERVICIOS ? (
               <div className="mt-6 rounded-xl border border-border bg-card p-4 shadow-soft">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">

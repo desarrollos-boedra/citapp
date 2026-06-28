@@ -77,6 +77,7 @@ export default function ReservarPage() {
   const [paso, setPaso] = useState(0);
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [servicio, setServicio] = useState<Servicio | null>(null);
+  const [cargandoServicios, setCargandoServicios] = useState(true);
 
   // Horarios del negocio (se cargan una vez)
   const [horarioSemanal, setHorarioSemanal] = useState<FranjaHorario[]>([]);
@@ -125,7 +126,10 @@ export default function ReservarPage() {
     if (!barberiaId) return;
     fetch(`/api/servicios?barberia_id=${barberiaId}`)
       .then((r) => r.json())
-      .then((data) => setServicios(data));
+      .then((data) => {
+        setServicios(data);
+        setCargandoServicios(false);
+      });
 
     fetch(`/api/horario-semanal?barberia_id=${barberiaId}`)
       .then((r) => (r.ok ? r.json() : []))
@@ -246,7 +250,7 @@ export default function ReservarPage() {
     setExito(true);
   }
 
-  if (cargandoSesion) {
+  if (cargandoSesion || cargandoServicios) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <svg className="h-6 w-6 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
@@ -374,7 +378,8 @@ export default function ReservarPage() {
                       return { year: d.getFullYear(), month: d.getMonth() };
                     })
                   }
-                  className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background text-muted-foreground transition hover:bg-secondary"
+                  disabled={mesVista.year === new Date().getFullYear() && mesVista.month === new Date().getMonth()}
+                  className="grid h-8 w-8 place-items-center rounded-full border border-border bg-background text-muted-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-background"
                 >
                   ‹
                 </button>
@@ -411,16 +416,17 @@ export default function ReservarPage() {
                   const esPasado = d < hoy;
                   const fs = fechaStr(d);
                   const seleccionado = diaSeleccionado ? fechaStr(diaSeleccionado) === fs : false;
+                  const cerrado = !esPasado && franjasDeFecha(d).length === 0;
                   return (
                     <button
                       key={i}
-                      disabled={esPasado}
+                      disabled={esPasado || cerrado}
                       onClick={() => {
                         setDiaSeleccionado(d);
                         cargarHorarios(d);
                       }}
                       className={`aspect-square rounded-lg text-sm font-semibold transition ${
-                        esPasado
+                        esPasado || cerrado
                           ? "cursor-not-allowed text-muted-foreground/40"
                           : seleccionado
                             ? "bg-primary text-primary-foreground"

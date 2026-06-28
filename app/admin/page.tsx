@@ -104,6 +104,15 @@ export default function AdminPage() {
     comprobarSesion();
   }, [router]);
 
+  const [confirmacion, setConfirmacion] = useState<{
+    texto: string;
+    onConfirmar: () => void;
+  } | null>(null);
+
+  function pedirConfirmacion(texto: string, onConfirmar: () => void) {
+    setConfirmacion({ texto, onConfirmar });
+  }
+
   const cargarReservas = useCallback(async () => {
     setLoadingReservas(true);
     const res = await fetch("/api/reservas-admin");
@@ -144,15 +153,17 @@ export default function AdminPage() {
     if (tab === "servicios") cargarServicios();
   }, [tab, barberiaId, cargarReservas, cargarHorario, cargarServicios]);
 
-  async function cancelarReserva(id: string) {
-    setReservas((prev) => prev.map((r) => (r.id === id ? { ...r, estado: "cancelada" } : r)));
-    const res = await fetch("/api/cancelar-reserva", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+  function cancelarReserva(id: string) {
+    pedirConfirmacion("¿Cancelar esta cita? Se notificará como cancelada.", async () => {
+      setReservas((prev) => prev.map((r) => (r.id === id ? { ...r, estado: "cancelada" } : r)));
+      const res = await fetch("/api/cancelar-reserva", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) notificar("Reserva cancelada");
+      else notificar("No se pudo cancelar", "error");
     });
-    if (res.ok) notificar("Reserva cancelada");
-    else notificar("No se pudo cancelar", "error");
   }
 
   // --- Horario semanal ---
@@ -260,7 +271,8 @@ export default function AdminPage() {
     }
   }
 
-  async function borrarExcepcion(fecha: string) {
+function borrarExcepcion(fecha: string) {
+  pedirConfirmacion(`¿Quitar el día especial del ${formatFecha(fecha)}?`, async () => {
     setExcepciones((prev) => prev.filter((e) => e.fecha !== fecha));
     await fetch("/api/excepciones", {
       method: "DELETE",
@@ -268,7 +280,8 @@ export default function AdminPage() {
       body: JSON.stringify({ fecha }),
     });
     notificar("Día especial eliminado");
-  }
+  });
+}
 
   // --- Servicios ---
   async function crearServicio() {
@@ -298,7 +311,8 @@ export default function AdminPage() {
     }
   }
 
-  async function eliminarServicio(id: string) {
+function eliminarServicio(id: string, nombre: string) {
+  pedirConfirmacion(`¿Borrar el servicio "${nombre}"? Esta acción no se puede deshacer.`, async () => {
     setServicios((prev) => prev.filter((s) => s.id !== id));
     await fetch("/api/servicios", {
       method: "DELETE",
@@ -306,7 +320,8 @@ export default function AdminPage() {
       body: JSON.stringify({ id }),
     });
     notificar("Servicio eliminado");
-  }
+  });
+}
 
   if (cargandoSesion) {
     return (
@@ -330,7 +345,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-primary/15 bg-primary/[0.07] backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-3.5">
           <span className="text-sm font-semibold tracking-tight">Panel de gestión</span>
           <button
@@ -702,7 +717,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => eliminarServicio(s.id)}
+                    onClick={() => eliminarServicio(s.id, s.nombre)}
                     className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/15"
                   >
                     Borrar
@@ -766,6 +781,32 @@ export default function AdminPage() {
             }`}
           >
             {mensaje.texto}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación */}
+      {confirmacion && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-foreground/40 backdrop-blur-sm px-5">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-5 shadow-card">
+            <p className="text-sm font-medium text-foreground">{confirmacion.texto}</p>
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => setConfirmacion(null)}
+                className="flex-1 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  confirmacion.onConfirmar();
+                  setConfirmacion(null);
+                }}
+                className="flex-1 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground shadow-soft transition hover:opacity-90"
+              >
+                Sí, eliminar
+              </button>
+            </div>
           </div>
         </div>
       )}

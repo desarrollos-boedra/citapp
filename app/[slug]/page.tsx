@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
+import Image from "next/image";
 
 type Barberia = {
   id: string;
@@ -26,11 +27,13 @@ type Usuario = {
   id: string;
 };
 
+type FranjaHorario = { dia_semana: number; hora_inicio: string; hora_fin: string };
+
 export default function HomeBarberia() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
   const slug = params.slug;
-
+  const [horarioSemanal, setHorarioSemanal] = useState<FranjaHorario[]>([]);
   const [barberia, setBarberia] = useState<Barberia | null>(null);
   const [cargando, setCargando] = useState(true);
   const [noEncontrada, setNoEncontrada] = useState(false);
@@ -39,27 +42,33 @@ export default function HomeBarberia() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  useEffect(() => {
-    async function cargar() {
-      const res = await fetch(`/api/barberia/${slug}`);
-      if (!res.ok) {
-        setNoEncontrada(true);
-        setCargando(false);
-        return;
-      }
-      const data: Barberia = await res.json();
-      setBarberia(data);
-
-      const resServicios = await fetch(`/api/servicios?barberia_id=${data.id}`);
-      if (resServicios.ok) {
-        const svcs = await resServicios.json();
-        setServicios(svcs);
-      }
-
+useEffect(() => {
+  async function cargar() {
+    const res = await fetch(`/api/barberia/${slug}`);
+    if (!res.ok) {
+      setNoEncontrada(true);
       setCargando(false);
+      return;
     }
-    cargar();
-  }, [slug]);
+    const data: Barberia = await res.json();
+    setBarberia(data);
+
+    const resServicios = await fetch(`/api/servicios?barberia_id=${data.id}`);
+    if (resServicios.ok) {
+      const svcs = await resServicios.json();
+      setServicios(svcs);
+    }
+
+    const resHorario = await fetch(`/api/horario-semanal?barberia_id=${data.id}`);
+    if (resHorario.ok) {
+      const horario = await resHorario.json();
+      setHorarioSemanal(horario);
+    }
+
+    setCargando(false);
+  }
+  cargar();
+}, [slug]);
 
   useEffect(() => {
     async function cargarSesion() {
@@ -93,6 +102,17 @@ export default function HomeBarberia() {
     );
   }
 
+  const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+  function horarioPorDia() {
+    return DIAS.map((nombreDia, idx) => {
+      const franjas = horarioSemanal
+        .filter((f) => f.dia_semana === idx)
+        .map((f) => `${f.hora_inicio.substring(0, 5)}–${f.hora_fin.substring(0, 5)}`);
+      return { dia: nombreDia, franjas };
+    });
+  }
+
   if (noEncontrada || !barberia) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-6">
@@ -107,20 +127,24 @@ export default function HomeBarberia() {
   const inicial = barberia.nombre.trim().charAt(0).toUpperCase();
 
 return (
-  <div className="min-h-screen overflow-x-hidden bg-background">
+  <div className="min-h-screen bg-background">
       {/* Header */}
       <header
-  className={`sticky top-0 z-40 border-b transition-all duration-300 ${
-    scrolled
-      ? "border-primary/15 bg-primary/[0.07] backdrop-blur-md shadow-[var(--shadow-soft)]"
-      : "border-primary/10 bg-primary/[0.045] backdrop-blur"
-  }`}
->
+        className={`sticky top-0 z-40 border-b transition-all duration-300 ${
+          scrolled
+            ? "border-primary/15 bg-primary/[0.07] backdrop-blur-md shadow-[var(--shadow-soft)]"
+            : "border-primary/10 bg-primary/[0.045] backdrop-blur"
+        }`}
+      >
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-4 sm:px-5">
           <div className="flex items-center gap-3">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary font-serif text-base font-semibold text-primary-foreground shadow-[var(--shadow-soft)]">
-              {inicial}
-            </span>
+           <Image
+            src="/boedra-logo.png"
+            alt="Boedra"
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0 -translate-y-px object-contain"
+          />
             <span className="font-serif text-[16px] font-semibold tracking-tight">{barberia.nombre}</span>
           </div>
 
@@ -159,12 +183,12 @@ return (
       </header>
 
       {/* Hero */}
-      <main className="mx-auto max-w-5xl px-5 overflow-x-hidden">
-  <section className="relative py-20 text-center sm:py-28">
-          <div
-  aria-hidden
-  className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.14] blur-[100px]"
-/>
+      <main className="mx-auto max-w-5xl px-5">
+        <section className="relative overflow-hidden py-20 text-center sm:py-28">
+                <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.14] blur-[100px]"
+      />
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-accent px-3.5 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-primary" />
             <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-foreground">
@@ -193,7 +217,7 @@ return (
 
         {/* Servicios */}
         {servicios.length > 0 && (
-          <section className="mx-auto max-w-2xl pb-24">
+          <section className="mx-auto max-w-2xl pb-10">
             <div className="mb-5 flex items-center gap-3">
               <h2 className="font-serif text-[13px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Servicios
@@ -227,6 +251,39 @@ return (
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* Horario */}
+        {horarioSemanal.length > 0 && (
+          <section className="mx-auto max-w-2xl pb-24">
+            <div className="mb-5 flex items-center gap-3">
+              <h2 className="font-serif text-[13px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Horario
+              </h2>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_8px_-2px_rgba(35,28,15,0.08),0_20px_44px_-16px_rgba(35,28,15,0.18)]">
+              {horarioPorDia().map(({ dia, franjas }, i) => {
+                const hoy = (new Date().getDay() + 6) % 7; // 0=lunes
+                const esHoy = i === hoy;
+                return (
+                  <div
+                    key={dia}
+                    className={`flex items-center justify-between px-5 py-3 ${i !== 0 ? "border-t border-border" : ""} ${
+                      esHoy ? "bg-accent/40" : ""
+                    }`}
+                  >
+                    <span className={`text-sm ${esHoy ? "font-semibold text-accent-foreground" : "text-foreground"}`}>
+                      {dia}
+                    </span>
+                    <span className={`text-sm ${franjas.length === 0 ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
+                      {franjas.length > 0 ? franjas.join("  ·  ") : "Cerrado"}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}

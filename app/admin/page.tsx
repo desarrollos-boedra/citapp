@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 
@@ -54,6 +54,17 @@ function diaSemanaDeFecha(fecha: string): number {
   return (js + 6) % 7; // 0=lunes
 }
 
+function fechaLocalISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function fechaDeReserva(fechaHora: string): string {
+  return fechaHora.split(" ")[0];
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [barberiaId, setBarberiaId] = useState<string | null>(null);
@@ -65,7 +76,9 @@ export default function AdminPage() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [loadingReservas, setLoadingReservas] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState("confirmada");
-
+  const [hoyISO, setHoyISO] = useState(() => fechaLocalISO(new Date()));
+  const [diaSeleccionado, setDiaSeleccionado] = useState<string>(hoyISO);
+  const tiraRef = useRef<HTMLDivElement>(null);
   // Horario semanal: por cada día, franja mañana y tarde (opcionales)
   const [horarioDias, setHorarioDias] = useState<
     { manana: { inicio: string; fin: string } | null; tarde: { inicio: string; fin: string } | null }[]
@@ -148,11 +161,20 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!barberiaId) return;
-    if (tab === "reservas") cargarReservas();
+    if (tab === "reservas") {
+      const nuevoHoy = fechaLocalISO(new Date());
+      setHoyISO(nuevoHoy);
+      setDiaSeleccionado(nuevoHoy);
+      cargarReservas();
+    }
     if (tab === "horario") cargarHorario();
     if (tab === "servicios") cargarServicios();
   }, [tab, barberiaId, cargarReservas, cargarHorario, cargarServicios]);
 
+  useEffect(() => {
+    const activo = tiraRef.current?.querySelector<HTMLElement>("[data-activo='true']");
+    activo?.scrollIntoView({ inline: "center", block: "nearest" });
+}, [filtroEstado, reservas.length, diaSeleccionado, hoyISO]);
   function cancelarReserva(id: string) {
     pedirConfirmacion("¿Cancelar esta cita? Se notificará como cancelada.", async () => {
       setReservas((prev) => prev.map((r) => (r.id === id ? { ...r, estado: "cancelada" } : r)));
@@ -334,7 +356,21 @@ function eliminarServicio(id: string, nombre: string) {
     );
   }
 
-  const reservasFiltradas = reservas.filter((r) => r.estado === filtroEstado);
+  const reservasPorEstado = reservas.filter((r) => r.estado === filtroEstado);
+
+  const DIAS_ATRAS = 7;
+  const DIAS_ADELANTE = 30;
+  const hoy = new Date();
+  const dias: string[] = [];
+  for (let i = -DIAS_ATRAS; i <= DIAS_ADELANTE; i++) {
+    const d = new Date(hoy);
+    d.setDate(hoy.getDate() + i);
+    dias.push(fechaLocalISO(d));
+  }
+
+  const reservasFiltradas = reservasPorEstado
+    .filter((r) => fechaDeReserva(r.fecha_hora) === diaSeleccionado)
+    .sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora));
 
   // Agrupar excepciones por fecha (para mostrar varias franjas juntas)
   const excepcionesPorFecha = excepciones.reduce<Record<string, Excepcion[]>>((acc, e) => {
@@ -390,7 +426,10 @@ function eliminarServicio(id: string, nombre: string) {
               {["confirmada", "cancelada", "completada"].map((f) => (
                 <button
                   key={f}
-                  onClick={() => setFiltroEstado(f)}
+                  onClick={() => {
+                  setFiltroEstado(f);
+                  setDiaSeleccionado(hoyISO);
+                }}
                   className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
                     filtroEstado === f
                       ? "border-primary bg-accent text-accent-foreground"
@@ -399,7 +438,51 @@ function eliminarServicio(id: string, nombre: string) {
                 >
                   {f === "confirmada" ? "Confirmadas" : f === "cancelada" ? "Canceladas" : "Completadas"}
                 </button>
-              ))}
+             ))}
+            </div>
+
+            {/* Scroll de días */}
+            <div className="-mx-5 mt-5 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div ref={tiraRef} className="flex gap-2">
+                {dias.map((f) => {
+                  const [y, m, d] = f.split("-");
+                  const obj = new Date(Number(y), Number(m) - 1, Number(d));
+                  const esHoy = f === hoyISO;
+                  const activo = f === diaSeleccionado;
+                  const num = reservasPorEstado.filter(
+                    (r) => fechaDeReserva(r.fecha_hora) === f
+                  ).length;
+                  return (
+                    <button
+                      key={f}
+                      data-activo={activo}
+                      onClick={() => setDiaSeleccionado(f)}
+                      className={`flex shrink-0 flex-col items-center rounded-xl border px-3.5 py-2 transition ${
+                        activo
+                          ? "border-primary bg-accent text-accent-foreground"
+                          : "border-border bg-card text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <span className="text-[10px] font-medium uppercase tracking-wide">
+                        {esHoy ? "Hoy" : obj.toLocaleDateString("es-ES", { weekday: "short" })}
+                      </span>
+                      <span className="text-lg font-semibold leading-tight">{obj.getDate()}</span>
+                      <span className="text-[10px] capitalize">
+                        {obj.toLocaleDateString("es-ES", { month: "short" })}
+                      </span>
+                      {num > 0 && (
+                        <span
+                          className={`mt-0.5 rounded-full px-1.5 text-[10px] font-semibold ${
+                            activo ? "bg-primary/20" : "bg-primary/10 text-primary"
+                          }`}
+                        >
+                          {num}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {loadingReservas ? (
@@ -411,7 +494,7 @@ function eliminarServicio(id: string, nombre: string) {
               </div>
             ) : reservasFiltradas.length === 0 ? (
               <div className="mt-5 rounded-xl border border-border bg-card py-12 text-center shadow-soft">
-                <p className="text-sm text-muted-foreground">No hay reservas en esta categoría.</p>
+                <p className="text-sm text-muted-foreground">No hay reservas este día.</p>
               </div>
             ) : (
               <div className="mt-5 space-y-3">

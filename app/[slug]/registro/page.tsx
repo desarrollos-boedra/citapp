@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import Image from "next/image";
 
 export default function RegistroPage() {
   const params = useParams<{ slug: string }>();
@@ -63,15 +64,24 @@ export default function RegistroPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-5 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <Link href={`/${slug}`} className="inline-flex items-center gap-2 text-sm font-semibold">
-            <span
-              aria-hidden
-              className="grid h-7 w-7 place-items-center rounded-md bg-primary text-primary-foreground text-xs font-bold"
-            >
-              T
-            </span>
-            Tu Negocio
-          </Link>
+          <div className="mb-8 text-center">
+            <Link
+                        href={`/${slug}`}
+                        className="mb-4 block text-left text-sm text-muted-foreground transition hover:text-foreground"
+                      >
+                        ← Volver
+                      </Link>
+            <Link href={`/${slug}`} className="inline-flex flex-col items-center gap-1.5 font-semibold">
+              <Image
+                src="/boedra-logo.png"
+                alt="Boedra"
+                width={28}
+                height={28}
+                className="h-7 w-7 shrink-0 object-contain"
+              />
+              <span className="text-xl tracking-tight">CitApp</span>
+            </Link>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 shadow-card sm:p-8">

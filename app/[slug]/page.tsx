@@ -41,6 +41,8 @@ export default function HomeBarberia() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [navegando, setNavegando] = useState(false);
+  const [pestana, setPestana] = useState<"inicio" | "reservas">("inicio");
 
 useEffect(() => {
   async function cargar() {
@@ -150,7 +152,7 @@ return (
 
           {usuario ? (
             <div className="flex items-center gap-3">
-              <span className="hidden text-sm text-muted-foreground sm:inline">
+              <span className="text-sm text-muted-foreground">
                 Hola, <span className="font-medium text-foreground">{usuario.nombre.split(" ")[0]}</span>
               </span>
               <button
@@ -165,26 +167,26 @@ return (
             </div>
           ) : (
            <div className="flex items-center gap-1.5 shrink-0 sm:gap-2">
-  <Link
-    href={`/${slug}/login`}
-    className="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-[13px] font-medium transition hover:border-primary/30 hover:bg-secondary sm:px-3.5 sm:text-sm"
-  >
-    Entrar
-  </Link>
-  <Link
-    href={`/${slug}/registro`}
-    className="rounded-md bg-primary px-2.5 py-1.5 text-[13px] font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition hover:opacity-90 sm:px-3.5 sm:text-sm"
-  >
-    Registro
-  </Link>
-</div>
+            <button
+              onClick={() => { setNavegando(true); router.push(`/${slug}/login`); }}
+              className="rounded-md border border-border bg-transparent px-2.5 py-1.5 text-[13px] font-medium transition hover:border-primary/30 hover:bg-secondary sm:px-3.5 sm:text-sm"
+            >
+              Entrar
+            </button>
+            <button
+              onClick={() => { setNavegando(true); router.push(`/${slug}/registro`); }}
+              className="rounded-md bg-primary px-2.5 py-1.5 text-[13px] font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition hover:opacity-90 sm:px-3.5 sm:text-sm"
+            >
+              Registro
+            </button>
+          </div>
           )}
         </div>
       </header>
 
       {/* Hero */}
       <main className="mx-auto max-w-5xl px-5">
-        <section className="relative overflow-hidden py-20 text-center sm:py-28">
+        <section className="relative overflow-hidden py-12 text-center sm:py-16">
                 <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.14] blur-[100px]"
@@ -271,15 +273,15 @@ return (
                 return (
                   <div
                     key={dia}
-                    className={`flex items-center justify-between px-5 py-3 ${i !== 0 ? "border-t border-border" : ""} ${
+                    className={`flex items-center justify-between gap-3 px-5 py-3 ${i !== 0 ? "border-t border-border" : ""} ${
                       esHoy ? "bg-accent/40" : ""
                     }`}
                   >
-                    <span className={`text-sm ${esHoy ? "font-semibold text-accent-foreground" : "text-foreground"}`}>
+                    <span className={`text-sm shrink-0 ${esHoy ? "font-semibold text-accent-foreground" : "text-foreground"}`}>
                       {dia}
                     </span>
-                    <span className={`text-sm ${franjas.length === 0 ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
-                      {franjas.length > 0 ? franjas.join("  ·  ") : "Cerrado"}
+                    <span className={`text-sm text-right whitespace-nowrap tabular-nums ${franjas.length === 0 ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
+                      {franjas.length > 0 ? franjas.join(" · ") : "Cerrado"}
                     </span>
                   </div>
                 );
@@ -323,6 +325,41 @@ return (
             </div>
           </div>
         </div>
+      )}
+
+      {navegando && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <svg className="h-6 w-6 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      )}
+
+      {/* Footer nav */}
+      {usuario && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/90 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-5xl items-center justify-around px-4 py-3">
+            <button
+              onClick={() => setPestana("inicio")}
+              className={`flex flex-col items-center gap-1 transition-colors ${pestana === "inicio" ? "text-primary" : "text-muted-foreground"}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span className="text-[10px] font-semibold uppercase tracking-wider">Inicio</span>
+            </button>
+            <button
+              onClick={() => setPestana("reservas")}
+              className={`flex flex-col items-center gap-1 transition-colors ${pestana === "reservas" ? "text-primary" : "text-muted-foreground"}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-[10px] font-semibold uppercase tracking-wider">Reservas</span>
+            </button>
+          </div>
+        </nav>
       )}
     </div>
   );

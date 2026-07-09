@@ -20,8 +20,13 @@ type Excepcion = {
   hora_fin: string | null;
 };
 
+type Bloqueo = {
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+};
+
 const PASOS = ["Servicio", "Fecha", "Confirmar"];
-const INTERVALO_MIN = 15; // huecos cada 15 minutos
 
 function getDiasDelMes(year: number, month: number) {
   const ultimoDia = new Date(year, month + 1, 0);
@@ -57,9 +62,9 @@ function diaSemana(d: Date): number {
 
 // Genera puntos de inicio (cada INTERVALO_MIN) dentro de una franja,
 // asegurando que un servicio de `duracion` minutos cabe antes del fin.
-function generarSlotsDeFranja(inicioMin: number, finMin: number, duracion: number): string[] {
+function generarSlotsDeFranja(inicioMin: number, finMin: number, duracion: number, intervalo: number): string[] {
   const slots: string[] = [];
-  for (let min = inicioMin; min + duracion <= finMin; min += INTERVALO_MIN) {
+  for (let min = inicioMin; min + duracion <= finMin; min += intervalo) {
     slots.push(aHora(min));
   }
   return slots;
@@ -82,6 +87,8 @@ export default function ReservarPage() {
   // Horarios del negocio (se cargan una vez)
   const [horarioSemanal, setHorarioSemanal] = useState<FranjaHorario[]>([]);
   const [excepciones, setExcepciones] = useState<Excepcion[]>([]);
+  const [bloqueos, setBloqueos] = useState<Bloqueo[]>([]);
+  const [intervalo, setIntervalo] = useState(30);
 
   const [diaSeleccionado, setDiaSeleccionado] = useState<Date | null>(null);
   const [horasDisponibles, setHorasDisponibles] = useState<{ hora: string; ocupada: boolean }[]>([]);
@@ -138,6 +145,14 @@ export default function ReservarPage() {
     fetch(`/api/excepciones?barberia_id=${barberiaId}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setExcepciones(data));
+
+    fetch(`/api/bloqueos?barberia_id=${barberiaId}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setBloqueos(data));
+
+    fetch(`/api/intervalo?barberia_id=${barberiaId}`)
+      .then((r) => (r.ok ? r.json() : { intervalo_min: 30 }))
+      .then((data) => setIntervalo(data.intervalo_min ?? 30));
   }, [barberiaId]);
 
   // Devuelve las franjas [inicioMin, finMin] que aplican a una fecha concreta,
@@ -184,7 +199,7 @@ export default function ReservarPage() {
     // Generar todos los slots posibles donde el servicio cabe
     let slots: string[] = [];
     for (const [ini, fin] of franjas) {
-      slots = [...slots, ...generarSlotsDeFranja(ini, fin, duracionServicio)];
+      slots = [...slots, ...generarSlotsDeFranja(ini, fin, duracionServicio, intervalo)];
     }
 
     // Reservas existentes ese día, para marcar ocupadas
@@ -195,13 +210,22 @@ export default function ReservarPage() {
       ? await resReservas.json()
       : [];
 
+    const bloqueosDia = bloqueos.filter((b) => b.fecha === fecha);
+
     const ocupado = (slot: string) => {
       const slotMin = aMinutos(slot);
       const slotFinMin = slotMin + duracionServicio;
+      // Reservas existentes
       for (const r of reservasDia) {
         const rMin = aMinutos(r.fecha_hora.substring(11, 16));
         const rFinMin = rMin + (r.duracion_min ?? 30);
         if (slotMin < rFinMin && slotFinMin > rMin) return true;
+      }
+      // Bloqueos puntuales (médico, etc.)
+      for (const b of bloqueosDia) {
+        const bMin = aMinutos(b.hora_inicio);
+        const bFinMin = aMinutos(b.hora_fin);
+        if (slotMin < bFinMin && slotFinMin > bMin) return true;
       }
       return false;
     };
@@ -243,7 +267,8 @@ export default function ReservarPage() {
     setLoading(false);
 
     if (!res.ok) {
-      setError("Ha ocurrido un error. Inténtalo de nuevo.");
+      const data = await res.json().catch(() => null);
+      setError(data?.error ?? "Ha ocurrido un error. Inténtalo de nuevo.");
       return;
     }
 

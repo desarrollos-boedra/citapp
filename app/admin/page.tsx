@@ -19,6 +19,14 @@ type Servicio = {
   activo: boolean;
 };
 
+type Bloqueo = {
+  id: string;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  motivo: string | null;
+};
+
 type Franja = { dia_semana: number; hora_inicio: string; hora_fin: string };
 type Excepcion = {
   id: string;
@@ -85,6 +93,16 @@ export default function AdminPage() {
   >(() => DIAS.map(() => ({ manana: null, tarde: null })));
   const [excepciones, setExcepciones] = useState<Excepcion[]>([]);
   const [guardandoHorario, setGuardandoHorario] = useState(false);
+  // Intervalo de citas
+  const [intervalo, setIntervalo] = useState(30);
+  const [guardandoIntervalo, setGuardandoIntervalo] = useState(false);
+
+  // Bloqueos de horas sueltas
+  const [bloqueos, setBloqueos] = useState<Bloqueo[]>([]);
+  const [bloqFecha, setBloqFecha] = useState("");
+  const [bloqInicio, setBloqInicio] = useState("07:00");
+  const [bloqFin, setBloqFin] = useState("08:00");
+  const [bloqMotivo, setBloqMotivo] = useState("");
 
   // Nueva excepción
   const [excFecha, setExcFecha] = useState("");
@@ -151,6 +169,15 @@ export default function AdminPage() {
 
     const resE = await fetch(`/api/excepciones?barberia_id=${barberiaId}`);
     if (resE.ok) setExcepciones(await resE.json());
+
+    const resB = await fetch(`/api/bloqueos?barberia_id=${barberiaId}`);
+    if (resB.ok) setBloqueos(await resB.json());
+
+    const resI = await fetch(`/api/intervalo?barberia_id=${barberiaId}`);
+    if (resI.ok) {
+      const data = await resI.json();
+      setIntervalo(data.intervalo_min ?? 30);
+    }
   }, [barberiaId]);
 
   const cargarServicios = useCallback(async () => {
@@ -229,6 +256,60 @@ export default function AdminPage() {
       const data = await res.json();
       notificar(data.error ?? "Error al guardar", "error");
     }
+  }
+  async function guardarIntervalo(nuevo: number) {
+    setIntervalo(nuevo);
+    setGuardandoIntervalo(true);
+    const res = await fetch("/api/intervalo", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intervalo_min: nuevo }),
+    });
+    setGuardandoIntervalo(false);
+    if (res.ok) notificar("Intervalo guardado");
+    else notificar("Error al guardar el intervalo", "error");
+  }
+
+  async function crearBloqueo() {
+    if (!bloqFecha || !bloqInicio || !bloqFin) {
+      notificar("Rellena fecha y horas", "error");
+      return;
+    }
+    if (bloqInicio >= bloqFin) {
+      notificar("La hora de fin debe ser posterior", "error");
+      return;
+    }
+    const res = await fetch("/api/bloqueos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fecha: bloqFecha,
+        hora_inicio: bloqInicio,
+        hora_fin: bloqFin,
+        motivo: bloqMotivo,
+      }),
+    });
+    if (res.ok) {
+      setBloqFecha("");
+      setBloqMotivo("");
+      await cargarHorario();
+      notificar("Bloqueo guardado");
+    } else {
+      const data = await res.json();
+      notificar(data.error ?? "Error al guardar", "error");
+    }
+  }
+
+  function borrarBloqueo(id: string) {
+    pedirConfirmacion("¿Quitar este bloqueo?", async () => {
+      setBloqueos((prev) => prev.filter((b) => b.id !== id));
+      await fetch("/api/bloqueos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      notificar("Bloqueo eliminado");
+    });
   }
 
   // Cuando se elige una fecha para la excepción, pre-cargar el horario de ese día de la semana
@@ -373,10 +454,12 @@ function eliminarServicio(id: string, nombre: string) {
     .sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora));
 
   // Agrupar excepciones por fecha (para mostrar varias franjas juntas)
-  const excepcionesPorFecha = excepciones.reduce<Record<string, Excepcion[]>>((acc, e) => {
-    (acc[e.fecha] ??= []).push(e);
-    return acc;
-  }, {});
+  const excepcionesPorFecha = excepciones
+    .filter((e) => e.fecha >= hoyISO)
+    .reduce<Record<string, Excepcion[]>>((acc, e) => {
+      (acc[e.fecha] ??= []).push(e);
+      return acc;
+    }, {});
 
   return (
     <div className="min-h-screen bg-background">
@@ -768,7 +851,115 @@ function eliminarServicio(id: string, nombre: string) {
                         </button>
                       </div>
                     );
-                  })}
+                })}
+                </div>
+              )}
+            </div>
+
+            {/* Intervalo entre citas */}
+            <div className="mt-10">
+              <h3 className="text-lg font-semibold tracking-tight">Intervalo entre citas</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Cada cuánto se ofrecen huecos a tus clientes al reservar.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {[10, 15, 20, 30, 45, 60].map((min) => (
+                  <button
+                    key={min}
+                    onClick={() => guardarIntervalo(min)}
+                    disabled={guardandoIntervalo}
+                    className={`rounded-md border px-4 py-2 text-sm font-medium transition disabled:opacity-50 ${
+                      intervalo === min
+                        ? "border-primary bg-accent text-accent-foreground"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {min} min
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bloqueos de horas sueltas */}
+            <div className="mt-10">
+              <h3 className="text-lg font-semibold tracking-tight">Bloquear horas sueltas</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Bloquea una franja concreta de un día (por ejemplo, una cita médica) sin cerrar todo el día.
+              </p>
+
+              <div className="mt-4 rounded-xl border border-border bg-card p-4 shadow-soft">
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium">Fecha</span>
+                  <input
+                    type="date"
+                    value={bloqFecha}
+                    onChange={(e) => setBloqFecha(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                </label>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="flex-1">
+                    <span className="mb-1.5 block text-sm font-medium">Desde</span>
+                    <input
+                      type="time"
+                      value={bloqInicio}
+                      onChange={(e) => setBloqInicio(e.target.value)}
+                      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <span className="mb-1.5 block text-sm font-medium">Hasta</span>
+                    <input
+                      type="time"
+                      value={bloqFin}
+                      onChange={(e) => setBloqFin(e.target.value)}
+                      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <label className="mt-3 block">
+                  <span className="mb-1.5 block text-sm font-medium">Motivo (opcional)</span>
+                  <input
+                    type="text"
+                    placeholder="Ej. Médico"
+                    value={bloqMotivo}
+                    onChange={(e) => setBloqMotivo(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                </label>
+
+                <button
+                  onClick={crearBloqueo}
+                  className="mt-4 w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90"
+                >
+                  Bloquear franja
+                </button>
+              </div>
+
+              {bloqueos.filter((b) => b.fecha >= hoyISO).length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {bloqueos.filter((b) => b.fecha >= hoyISO).map((b) => (
+                    <div
+                      key={b.id}
+                      className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 shadow-soft"
+                    >
+                      <div>
+                        <div className="text-sm font-medium capitalize">{formatFecha(b.fecha)}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {b.hora_inicio.substring(0, 5)}–{b.hora_fin.substring(0, 5)}
+                          {b.motivo ? `  ·  ${b.motivo}` : ""}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => borrarBloqueo(b.id)}
+                        className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/15"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

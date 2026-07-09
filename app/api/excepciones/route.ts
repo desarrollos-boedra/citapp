@@ -10,14 +10,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Falta barberia_id" }, { status: 400 });
   }
 
+  const hoy = new Date();
+  const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+
   const supabase = supabaseAdmin();
   const { data, error } = await supabase
     .from("excepciones")
     .select("id, fecha, cerrado, hora_inicio, hora_fin")
     .eq("barberia_id", barberiaId)
+    .gte("fecha", hoyStr)
     .order("fecha")
     .order("hora_inicio");
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);
 }

@@ -19,22 +19,25 @@ type Servicio = {
   activo: boolean;
 };
 
-type Bloqueo = {
-  id: string;
-  fecha: string;
-  hora_inicio: string;
-  hora_fin: string;
-  motivo: string | null;
-};
+// --- PRO: tipo de bloqueo (comentado en plan Básico) ---
+// type Bloqueo = {
+//   id: string;
+//   fecha: string;
+//   hora_inicio: string;
+//   hora_fin: string;
+//   motivo: string | null;
+// };
 
 type Franja = { dia_semana: number; hora_inicio: string; hora_fin: string };
-type Excepcion = {
-  id: string;
-  fecha: string;
-  cerrado: boolean;
-  hora_inicio: string | null;
-  hora_fin: string | null;
-};
+
+// --- PRO: tipo de excepción / día especial (comentado en plan Básico) ---
+// type Excepcion = {
+//   id: string;
+//   fecha: string;
+//   cerrado: boolean;
+//   hora_inicio: string | null;
+//   hora_fin: string | null;
+// };
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const LIMITE_SERVICIOS = 4;
@@ -73,6 +76,27 @@ function fechaDeReserva(fechaHora: string): string {
   return fechaHora.split(" ")[0];
 }
 
+// "HH:MM" -> minutos desde medianoche
+function aMinutos(hhmm: string): number {
+  const [h, m] = hhmm.substring(0, 5).split(":").map(Number);
+  return h * 60 + m;
+}
+
+// minutos -> "HH:MM"
+function aHora(min: number): string {
+  const hh = String(Math.floor(min / 60)).padStart(2, "0");
+  const mm = String(min % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function generarSlots(inicioMin: number, finMin: number, duracion: number, intervalo: number): string[] {
+  const slots: string[] = [];
+  for (let min = inicioMin; min + duracion <= finMin; min += intervalo) {
+    slots.push(aHora(min));
+  }
+  return slots;
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [barberiaId, setBarberiaId] = useState<string | null>(null);
@@ -87,34 +111,47 @@ export default function AdminPage() {
   const [hoyISO, setHoyISO] = useState(() => fechaLocalISO(new Date()));
   const [diaSeleccionado, setDiaSeleccionado] = useState<string>(hoyISO);
   const tiraRef = useRef<HTMLDivElement>(null);
+  // Mover cita
+  const [moviendo, setMoviendo] = useState<Reserva | null>(null);
+  const [moverFecha, setMoverFecha] = useState("");
+  const [moverHoras, setMoverHoras] = useState<{ hora: string; ocupada: boolean }[]>([]);
+  const [moverHora, setMoverHora] = useState<string | null>(null);
+  const [cargandoMoverHoras, setCargandoMoverHoras] = useState(false);
+  const [guardandoMover, setGuardandoMover] = useState(false);
   // Horario semanal: por cada día, franja mañana y tarde (opcionales)
   const [horarioDias, setHorarioDias] = useState<
     { manana: { inicio: string; fin: string } | null; tarde: { inicio: string; fin: string } | null }[]
   >(() => DIAS.map(() => ({ manana: null, tarde: null })));
-  const [excepciones, setExcepciones] = useState<Excepcion[]>([]);
   const [guardandoHorario, setGuardandoHorario] = useState(false);
-  // Intervalo de citas
+
+  // --- PRO: intervalo de citas (comentado en plan Básico) ---
   const [intervalo, setIntervalo] = useState(30);
-  const [guardandoIntervalo, setGuardandoIntervalo] = useState(false);
+  // const [guardandoIntervalo, setGuardandoIntervalo] = useState(false);
 
-  // Bloqueos de horas sueltas
-  const [bloqueos, setBloqueos] = useState<Bloqueo[]>([]);
-  const [bloqFecha, setBloqFecha] = useState("");
-  const [bloqInicio, setBloqInicio] = useState("07:00");
-  const [bloqFin, setBloqFin] = useState("08:00");
-  const [bloqMotivo, setBloqMotivo] = useState("");
+  // --- PRO: excepciones / días especiales (comentado en plan Básico) ---
+  // const [excepciones, setExcepciones] = useState<Excepcion[]>([]);
+  // const [excFecha, setExcFecha] = useState("");
+  // const [excCerrado, setExcCerrado] = useState(true);
+  // const [excManana, setExcManana] = useState<{ inicio: string; fin: string } | null>(null);
+  // const [excTarde, setExcTarde] = useState<{ inicio: string; fin: string } | null>(null);
 
-  // Nueva excepción
-  const [excFecha, setExcFecha] = useState("");
-  const [excCerrado, setExcCerrado] = useState(true);
-  const [excManana, setExcManana] = useState<{ inicio: string; fin: string } | null>(null);
-  const [excTarde, setExcTarde] = useState<{ inicio: string; fin: string } | null>(null);
+  // --- PRO: bloqueos de horas sueltas (comentado en plan Básico) ---
+  // const [bloqueos, setBloqueos] = useState<Bloqueo[]>([]);
+  // const [bloqFecha, setBloqFecha] = useState("");
+  // const [bloqInicio, setBloqInicio] = useState("07:00");
+  // const [bloqFin, setBloqFin] = useState("08:00");
+  // const [bloqMotivo, setBloqMotivo] = useState("");
 
   // Servicios
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevoPrecio, setNuevoPrecio] = useState("");
   const [nuevaDuracion, setNuevaDuracion] = useState("");
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editNombre, setEditNombre] = useState("");
+  const [editPrecio, setEditPrecio] = useState("");
+  const [editDuracion, setEditDuracion] = useState("");
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
   function notificar(texto: string, tipo: "ok" | "error" = "ok") {
     setMensaje({ texto, tipo });
@@ -167,12 +204,17 @@ export default function AdminPage() {
     }
     setHorarioDias(dias);
 
-    const resE = await fetch(`/api/excepciones?barberia_id=${barberiaId}`);
-    if (resE.ok) setExcepciones(await resE.json());
+    // --- PRO: cargar excepciones (comentado en plan Básico) ---
+    // const resE = await fetch(`/api/excepciones?barberia_id=${barberiaId}`);
+    // if (resE.ok) setExcepciones(await resE.json());
 
-    const resB = await fetch(`/api/bloqueos?barberia_id=${barberiaId}`);
-    if (resB.ok) setBloqueos(await resB.json());
+    // --- PRO: cargar bloqueos (comentado en plan Básico) ---
+    // const resB = await fetch(`/api/bloqueos?barberia_id=${barberiaId}`);
+    // if (resB.ok) setBloqueos(await resB.json());
 
+    // Intervalo: se sigue leyendo para que el "Mover cita" genere los huecos
+    // con el paso correcto. En Básico no se puede cambiar (fijo en 30), pero
+    // se lee por si el valor guardado fuera otro.
     const resI = await fetch(`/api/intervalo?barberia_id=${barberiaId}`);
     if (resI.ok) {
       const data = await resI.json();
@@ -201,7 +243,8 @@ export default function AdminPage() {
   useEffect(() => {
     const activo = tiraRef.current?.querySelector<HTMLElement>("[data-activo='true']");
     activo?.scrollIntoView({ inline: "center", block: "nearest" });
-}, [filtroEstado, reservas.length, diaSeleccionado, hoyISO]);
+  }, [filtroEstado, reservas.length, diaSeleccionado, hoyISO]);
+
   function cancelarReserva(id: string) {
     pedirConfirmacion("¿Cancelar esta cita? Se notificará como cancelada.", async () => {
       setReservas((prev) => prev.map((r) => (r.id === id ? { ...r, estado: "cancelada" } : r)));
@@ -213,6 +256,118 @@ export default function AdminPage() {
       if (res.ok) notificar("Reserva cancelada");
       else notificar("No se pudo cancelar", "error");
     });
+  }
+
+  // Abre el modal de mover: carga horario si hace falta
+  async function abrirMover(reserva: Reserva) {
+    setMoviendo(reserva);
+    setMoverFecha("");
+    setMoverHoras([]);
+    setMoverHora(null);
+    // Aseguramos tener horario e intervalo cargados
+    await cargarHorario();
+  }
+
+  // Franjas [inicioMin, finMin] de una fecha "YYYY-MM-DD" (solo horario semanal en Básico)
+  function franjasDeFechaAdmin(fecha: string): [number, number][] {
+    // --- PRO: excepciones tendrían prioridad aquí (comentado en Básico) ---
+    // const excDia = excepciones.filter((e) => e.fecha === fecha);
+    // if (excDia.length > 0) {
+    //   if (excDia.some((e) => e.cerrado)) return [];
+    //   return excDia
+    //     .filter((e) => e.hora_inicio && e.hora_fin)
+    //     .map((e) => [aMinutos(e.hora_inicio as string), aMinutos(e.hora_fin as string)] as [number, number]);
+    // }
+    const ds = diaSemanaDeFecha(fecha);
+    // horarioDias está en formato {manana, tarde}; lo convertimos a franjas
+    const d = horarioDias[ds];
+    const franjas: [number, number][] = [];
+    if (d?.manana) franjas.push([aMinutos(d.manana.inicio), aMinutos(d.manana.fin)]);
+    if (d?.tarde) franjas.push([aMinutos(d.tarde.inicio), aMinutos(d.tarde.fin)]);
+    return franjas;
+  }
+
+  // Calcula huecos libres del día destino para la cita que se está moviendo
+  async function cargarMoverHoras(fecha: string) {
+    if (!moviendo || !barberiaId) return;
+    setMoverFecha(fecha);
+    setMoverHora(null);
+    setMoverHoras([]);
+    if (!fecha) return;
+
+    setCargandoMoverHoras(true);
+    const duracion = moviendo.servicio?.duracion_min ?? 30;
+
+    const franjas = franjasDeFechaAdmin(fecha);
+    if (franjas.length === 0) {
+      setMoverHoras([]);
+      setCargandoMoverHoras(false);
+      return;
+    }
+
+    let slots: string[] = [];
+    for (const [ini, fin] of franjas) {
+      slots = [...slots, ...generarSlots(ini, fin, duracion, intervalo)];
+    }
+
+    // Reservas de ese día para marcar ocupadas
+    const resReservas = await fetch(`/api/reservas-dia?barberia_id=${barberiaId}&fecha=${fecha}`);
+    const reservasDia: { fecha_hora: string; duracion_min: number }[] = resReservas.ok
+      ? await resReservas.json()
+      : [];
+
+    // --- PRO: bloqueos de ese día (comentado en Básico) ---
+    // const bloqueosDia = bloqueos.filter((b) => b.fecha === fecha);
+    const horaActual = moviendo.fecha_hora.substring(11, 16); // para no marcar su propio hueco
+
+    const ocupado = (slot: string) => {
+      const slotMin = aMinutos(slot);
+      const slotFinMin = slotMin + duracion;
+      for (const r of reservasDia) {
+        // No contar la propia cita si sigue en su sitio original
+        if (fechaDeReserva(moviendo.fecha_hora) === fecha && r.fecha_hora.substring(11, 16) === horaActual) continue;
+        const rMin = aMinutos(r.fecha_hora.substring(11, 16));
+        const rFinMin = rMin + (r.duracion_min ?? 30);
+        if (slotMin < rFinMin && slotFinMin > rMin) return true;
+      }
+      // --- PRO: comprobar solape con bloqueos (comentado en Básico) ---
+      // for (const b of bloqueosDia) {
+      //   const bMin = aMinutos(b.hora_inicio);
+      //   const bFinMin = aMinutos(b.hora_fin);
+      //   if (slotMin < bFinMin && slotFinMin > bMin) return true;
+      // }
+      return false;
+    };
+
+    const ahora = new Date();
+    const esHoy = fechaLocalISO(ahora) === fecha;
+    const ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
+
+    setMoverHoras(
+      slots
+        .filter((h) => !(esHoy && aMinutos(h) <= ahoraMin))
+        .map((h) => ({ hora: h, ocupada: ocupado(h) })),
+    );
+    setCargandoMoverHoras(false);
+  }
+
+  async function confirmarMover() {
+    if (!moviendo || !moverFecha || !moverHora) return;
+    setGuardandoMover(true);
+    const res = await fetch("/api/mover-reserva", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: moviendo.id, fecha_hora: `${moverFecha} ${moverHora}` }),
+    });
+    setGuardandoMover(false);
+    if (res.ok) {
+      setMoviendo(null);
+      await cargarReservas();
+      notificar("Cita movida");
+    } else {
+      const data = await res.json().catch(() => null);
+      notificar(data?.error ?? "No se pudo mover", "error");
+    }
   }
 
   // --- Horario semanal ---
@@ -257,134 +412,136 @@ export default function AdminPage() {
       notificar(data.error ?? "Error al guardar", "error");
     }
   }
-  async function guardarIntervalo(nuevo: number) {
-    setIntervalo(nuevo);
-    setGuardandoIntervalo(true);
-    const res = await fetch("/api/intervalo", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intervalo_min: nuevo }),
-    });
-    setGuardandoIntervalo(false);
-    if (res.ok) notificar("Intervalo guardado");
-    else notificar("Error al guardar el intervalo", "error");
-  }
 
-  async function crearBloqueo() {
-    if (!bloqFecha || !bloqInicio || !bloqFin) {
-      notificar("Rellena fecha y horas", "error");
-      return;
-    }
-    if (bloqInicio >= bloqFin) {
-      notificar("La hora de fin debe ser posterior", "error");
-      return;
-    }
-    const res = await fetch("/api/bloqueos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fecha: bloqFecha,
-        hora_inicio: bloqInicio,
-        hora_fin: bloqFin,
-        motivo: bloqMotivo,
-      }),
-    });
-    if (res.ok) {
-      setBloqFecha("");
-      setBloqMotivo("");
-      await cargarHorario();
-      notificar("Bloqueo guardado");
-    } else {
-      const data = await res.json();
-      notificar(data.error ?? "Error al guardar", "error");
-    }
-  }
+  // --- PRO: guardar intervalo (comentado en plan Básico) ---
+  // async function guardarIntervalo(nuevo: number) {
+  //   setIntervalo(nuevo);
+  //   setGuardandoIntervalo(true);
+  //   const res = await fetch("/api/intervalo", {
+  //     method: "PUT",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({ intervalo_min: nuevo }),
+  //   });
+  //   setGuardandoIntervalo(false);
+  //   if (res.ok) notificar("Intervalo guardado");
+  //   else notificar("Error al guardar el intervalo", "error");
+  // }
 
-  function borrarBloqueo(id: string) {
-    pedirConfirmacion("¿Quitar este bloqueo?", async () => {
-      setBloqueos((prev) => prev.filter((b) => b.id !== id));
-      await fetch("/api/bloqueos", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      notificar("Bloqueo eliminado");
-    });
-  }
+  // --- PRO: crear/borrar bloqueos de horas sueltas (comentado en plan Básico) ---
+  // async function crearBloqueo() {
+  //   if (!bloqFecha || !bloqInicio || !bloqFin) {
+  //     notificar("Rellena fecha y horas", "error");
+  //     return;
+  //   }
+  //   if (bloqInicio >= bloqFin) {
+  //     notificar("La hora de fin debe ser posterior", "error");
+  //     return;
+  //   }
+  //   const res = await fetch("/api/bloqueos", {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({
+  //       fecha: bloqFecha,
+  //       hora_inicio: bloqInicio,
+  //       hora_fin: bloqFin,
+  //       motivo: bloqMotivo,
+  //     }),
+  //   });
+  //   if (res.ok) {
+  //     setBloqFecha("");
+  //     setBloqMotivo("");
+  //     await cargarHorario();
+  //     notificar("Bloqueo guardado");
+  //   } else {
+  //     const data = await res.json();
+  //     notificar(data.error ?? "Error al guardar", "error");
+  //   }
+  // }
 
-  // Cuando se elige una fecha para la excepción, pre-cargar el horario de ese día de la semana
-  function onCambiarFechaExcepcion(fecha: string) {
-    setExcFecha(fecha);
-    if (!fecha) {
-      setExcManana(null);
-      setExcTarde(null);
-      return;
-    }
-    const dia = diaSemanaDeFecha(fecha);
-    // Pre-cargar con el horario habitual de ese día de la semana
-    setExcManana(horarioDias[dia].manana ? { ...horarioDias[dia].manana! } : null);
-    setExcTarde(horarioDias[dia].tarde ? { ...horarioDias[dia].tarde! } : null);
-  }
+  // function borrarBloqueo(id: string) {
+  //   pedirConfirmacion("¿Quitar este bloqueo?", async () => {
+  //     setBloqueos((prev) => prev.filter((b) => b.id !== id));
+  //     await fetch("/api/bloqueos", {
+  //       method: "DELETE",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ id }),
+  //     });
+  //     notificar("Bloqueo eliminado");
+  //   });
+  // }
 
-  function toggleExcTurno(turno: "manana" | "tarde") {
-    if (turno === "manana") {
-      setExcManana((prev) => (prev ? null : { inicio: "09:30", fin: "13:45" }));
-    } else {
-      setExcTarde((prev) => (prev ? null : { inicio: "16:00", fin: "20:00" }));
-    }
-  }
+  // --- PRO: días especiales / excepciones (comentado en plan Básico) ---
+  // function onCambiarFechaExcepcion(fecha: string) {
+  //   setExcFecha(fecha);
+  //   if (!fecha) {
+  //     setExcManana(null);
+  //     setExcTarde(null);
+  //     return;
+  //   }
+  //   const dia = diaSemanaDeFecha(fecha);
+  //   setExcManana(horarioDias[dia].manana ? { ...horarioDias[dia].manana! } : null);
+  //   setExcTarde(horarioDias[dia].tarde ? { ...horarioDias[dia].tarde! } : null);
+  // }
 
-  function setExcFranja(turno: "manana" | "tarde", campo: "inicio" | "fin", valor: string) {
-    if (turno === "manana") {
-      setExcManana((prev) => ({ ...(prev ?? { inicio: "", fin: "" }), [campo]: valor }));
-    } else {
-      setExcTarde((prev) => ({ ...(prev ?? { inicio: "", fin: "" }), [campo]: valor }));
-    }
-  }
+  // function toggleExcTurno(turno: "manana" | "tarde") {
+  //   if (turno === "manana") {
+  //     setExcManana((prev) => (prev ? null : { inicio: "09:30", fin: "13:45" }));
+  //   } else {
+  //     setExcTarde((prev) => (prev ? null : { inicio: "16:00", fin: "20:00" }));
+  //   }
+  // }
 
-  async function crearExcepcion() {
-    if (!excFecha) {
-      notificar("Elige una fecha", "error");
-      return;
-    }
-    const franjas: { inicio: string; fin: string }[] = [];
-    if (!excCerrado) {
-      if (excManana) franjas.push(excManana);
-      if (excTarde) franjas.push(excTarde);
-      if (franjas.length === 0) {
-        notificar("Activa al menos un turno o marca el día como cerrado", "error");
-        return;
-      }
-    }
-    const res = await fetch("/api/excepciones", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fecha: excFecha, cerrado: excCerrado, franjas }),
-    });
-    if (res.ok) {
-      setExcFecha("");
-      setExcManana(null);
-      setExcTarde(null);
-      setExcCerrado(true);
-      await cargarHorario();
-      notificar("Día especial guardado");
-    } else {
-      const data = await res.json();
-      notificar(data.error ?? "Error", "error");
-    }
-  }
+  // function setExcFranja(turno: "manana" | "tarde", campo: "inicio" | "fin", valor: string) {
+  //   if (turno === "manana") {
+  //     setExcManana((prev) => ({ ...(prev ?? { inicio: "", fin: "" }), [campo]: valor }));
+  //   } else {
+  //     setExcTarde((prev) => ({ ...(prev ?? { inicio: "", fin: "" }), [campo]: valor }));
+  //   }
+  // }
 
-function borrarExcepcion(fecha: string) {
-  pedirConfirmacion(`¿Quitar el día especial del ${formatFecha(fecha)}?`, async () => {
-    setExcepciones((prev) => prev.filter((e) => e.fecha !== fecha));
-    await fetch("/api/excepciones", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fecha }),
-    });
-    notificar("Día especial eliminado");
-  });
-}
+  // async function crearExcepcion() {
+  //   if (!excFecha) {
+  //     notificar("Elige una fecha", "error");
+  //     return;
+  //   }
+  //   const franjas: { inicio: string; fin: string }[] = [];
+  //   if (!excCerrado) {
+  //     if (excManana) franjas.push(excManana);
+  //     if (excTarde) franjas.push(excTarde);
+  //     if (franjas.length === 0) {
+  //       notificar("Activa al menos un turno o marca el día como cerrado", "error");
+  //       return;
+  //     }
+  //   }
+  //   const res = await fetch("/api/excepciones", {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({ fecha: excFecha, cerrado: excCerrado, franjas }),
+  //   });
+  //   if (res.ok) {
+  //     setExcFecha("");
+  //     setExcManana(null);
+  //     setExcTarde(null);
+  //     setExcCerrado(true);
+  //     await cargarHorario();
+  //     notificar("Día especial guardado");
+  //   } else {
+  //     const data = await res.json();
+  //     notificar(data.error ?? "Error", "error");
+  //   }
+  // }
+
+  // function borrarExcepcion(fecha: string) {
+  //   pedirConfirmacion(`¿Quitar el día especial del ${formatFecha(fecha)}?`, async () => {
+  //     setExcepciones((prev) => prev.filter((e) => e.fecha !== fecha));
+  //     await fetch("/api/excepciones", {
+  //       method: "DELETE",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ fecha }),
+  //     });
+  //     notificar("Día especial eliminado");
+  //   });
+  // }
 
   // --- Servicios ---
   async function crearServicio() {
@@ -414,17 +571,55 @@ function borrarExcepcion(fecha: string) {
     }
   }
 
-function eliminarServicio(id: string, nombre: string) {
-  pedirConfirmacion(`¿Borrar el servicio "${nombre}"? Esta acción no se puede deshacer.`, async () => {
-    setServicios((prev) => prev.filter((s) => s.id !== id));
-    await fetch("/api/servicios", {
-      method: "DELETE",
+  function empezarEdicion(s: Servicio) {
+    setEditandoId(s.id);
+    setEditNombre(s.nombre);
+    setEditPrecio(String(s.precio));
+    setEditDuracion(String(s.duracion_min));
+  }
+
+  function cancelarEdicion() {
+    setEditandoId(null);
+  }
+
+  async function guardarEdicion(id: string) {
+    if (!editNombre || !editPrecio || !editDuracion) {
+      notificar("Rellena todos los campos", "error");
+      return;
+    }
+    setGuardandoEdicion(true);
+    const res = await fetch("/api/servicios", {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({
+        id,
+        nombre: editNombre,
+        precio: Number(editPrecio),
+        duracion_min: Number(editDuracion),
+      }),
     });
-    notificar("Servicio eliminado");
-  });
-}
+    setGuardandoEdicion(false);
+    if (res.ok) {
+      setEditandoId(null);
+      await cargarServicios();
+      notificar("Servicio actualizado");
+    } else {
+      const data = await res.json().catch(() => null);
+      notificar(data?.error ?? "Error al actualizar", "error");
+    }
+  }
+
+  function eliminarServicio(id: string, nombre: string) {
+    pedirConfirmacion(`¿Borrar el servicio "${nombre}"? Esta acción no se puede deshacer.`, async () => {
+      setServicios((prev) => prev.filter((s) => s.id !== id));
+      await fetch("/api/servicios", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      notificar("Servicio eliminado");
+    });
+  }
 
   if (cargandoSesion) {
     return (
@@ -453,13 +648,13 @@ function eliminarServicio(id: string, nombre: string) {
     .filter((r) => fechaDeReserva(r.fecha_hora) === diaSeleccionado)
     .sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora));
 
-  // Agrupar excepciones por fecha (para mostrar varias franjas juntas)
-  const excepcionesPorFecha = excepciones
-    .filter((e) => e.fecha >= hoyISO)
-    .reduce<Record<string, Excepcion[]>>((acc, e) => {
-      (acc[e.fecha] ??= []).push(e);
-      return acc;
-    }, {});
+  // --- PRO: agrupar excepciones por fecha (comentado en plan Básico) ---
+  // const excepcionesPorFecha = excepciones
+  //   .filter((e) => e.fecha >= hoyISO)
+  //   .reduce<Record<string, Excepcion[]>>((acc, e) => {
+  //     (acc[e.fecha] ??= []).push(e);
+  //     return acc;
+  //   }, {});
 
   return (
     <div className="min-h-screen bg-background">
@@ -510,9 +705,9 @@ function eliminarServicio(id: string, nombre: string) {
                 <button
                   key={f}
                   onClick={() => {
-                  setFiltroEstado(f);
-                  setDiaSeleccionado(hoyISO);
-                }}
+                    setFiltroEstado(f);
+                    setDiaSeleccionado(hoyISO);
+                  }}
                   className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
                     filtroEstado === f
                       ? "border-primary bg-accent text-accent-foreground"
@@ -521,7 +716,7 @@ function eliminarServicio(id: string, nombre: string) {
                 >
                   {f === "confirmada" ? "Confirmadas" : f === "cancelada" ? "Canceladas" : "Completadas"}
                 </button>
-             ))}
+              ))}
             </div>
 
             {/* Scroll de días */}
@@ -602,12 +797,20 @@ function eliminarServicio(id: string, nombre: string) {
                         </div>
                       )}
                       {r.estado === "confirmada" && (
-                        <button
-                          onClick={() => cancelarReserva(r.id)}
-                          className="mt-3 rounded-md border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/15"
-                        >
-                          Cancelar cita
-                        </button>
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            onClick={() => abrirMover(r)}
+                            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-soft transition hover:bg-secondary"
+                          >
+                            Mover cita
+                          </button>
+                          <button
+                            onClick={() => cancelarReserva(r.id)}
+                            className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/15"
+                          >
+                            Cancelar cita
+                          </button>
+                        </div>
                       )}
                     </div>
                   );
@@ -709,7 +912,13 @@ function eliminarServicio(id: string, nombre: string) {
               {guardandoHorario ? "Guardando..." : "Guardar horario"}
             </button>
 
-            {/* Días especiales */}
+            {/* ============================================================= */}
+            {/* PRO: Días especiales, Intervalo entre citas y Bloqueos.       */}
+            {/* Comentado en el plan Básico. Para reactivar en la Pro,        */}
+            {/* descomenta este bloque y también los estados/funciones de     */}
+            {/* arriba marcados con "PRO:".                                   */}
+            {/* ============================================================= */}
+            {/*
             <div className="mt-10">
               <h3 className="text-lg font-semibold tracking-tight">Días especiales</h3>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -752,7 +961,6 @@ function eliminarServicio(id: string, nombre: string) {
 
                 {!excCerrado && (
                   <div className="mt-4 space-y-2">
-                    {/* Mañana */}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => toggleExcTurno("manana")}
@@ -782,7 +990,6 @@ function eliminarServicio(id: string, nombre: string) {
                         </div>
                       )}
                     </div>
-                    {/* Tarde */}
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => toggleExcTurno("tarde")}
@@ -823,7 +1030,6 @@ function eliminarServicio(id: string, nombre: string) {
                 </button>
               </div>
 
-              {/* Lista de días especiales (agrupados por fecha) */}
               {Object.keys(excepcionesPorFecha).length > 0 && (
                 <div className="mt-4 space-y-2">
                   {Object.entries(excepcionesPorFecha).map(([fecha, items]) => {
@@ -851,12 +1057,11 @@ function eliminarServicio(id: string, nombre: string) {
                         </button>
                       </div>
                     );
-                })}
+                  })}
                 </div>
               )}
             </div>
 
-            {/* Intervalo entre citas */}
             <div className="mt-10">
               <h3 className="text-lg font-semibold tracking-tight">Intervalo entre citas</h3>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -880,7 +1085,6 @@ function eliminarServicio(id: string, nombre: string) {
               </div>
             </div>
 
-            {/* Bloqueos de horas sueltas */}
             <div className="mt-10">
               <h3 className="text-lg font-semibold tracking-tight">Bloquear horas sueltas</h3>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -963,6 +1167,8 @@ function eliminarServicio(id: string, nombre: string) {
                 </div>
               )}
             </div>
+            */}
+            {/* ============ FIN bloque PRO ============ */}
           </div>
         )}
 
@@ -979,25 +1185,79 @@ function eliminarServicio(id: string, nombre: string) {
             </div>
 
             <div className="mt-5 space-y-2.5">
-              {servicios.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 shadow-soft"
-                >
-                  <div>
-                    <div className="font-semibold">{s.nombre}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {s.duracion_min} min · {s.precio} €
+              {servicios.map((s) =>
+                editandoId === s.id ? (
+                  <div
+                    key={s.id}
+                    className="rounded-xl border border-primary/40 bg-card px-4 py-3.5 shadow-soft"
+                  >
+                    <input
+                      type="text"
+                      value={editNombre}
+                      onChange={(e) => setEditNombre(e.target.value)}
+                      placeholder="Nombre del servicio"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="number"
+                        value={editPrecio}
+                        onChange={(e) => setEditPrecio(e.target.value)}
+                        placeholder="Precio €"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                      <input
+                        type="number"
+                        value={editDuracion}
+                        onChange={(e) => setEditDuracion(e.target.value)}
+                        placeholder="Duración (min)"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={cancelarEdicion}
+                        className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() => guardarEdicion(s.id)}
+                        disabled={guardandoEdicion}
+                        className="flex-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90 disabled:opacity-50"
+                      >
+                        {guardandoEdicion ? "Guardando..." : "Guardar"}
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => eliminarServicio(s.id, s.nombre)}
-                    className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/15"
+                ) : (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 shadow-soft"
                   >
-                    Borrar
-                  </button>
-                </div>
-              ))}
+                    <div>
+                      <div className="font-semibold">{s.nombre}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {s.duracion_min} min · {s.precio} €
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => empezarEdicion(s)}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-soft transition hover:bg-secondary"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => eliminarServicio(s.id, s.nombre)}
+                        className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive transition hover:bg-destructive/15"
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                  </div>
+                ),
+              )}
             </div>
 
             {servicios.length < LIMITE_SERVICIOS ? (
@@ -1055,6 +1315,82 @@ function eliminarServicio(id: string, nombre: string) {
             }`}
           >
             {mensaje.texto}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de mover cita */}
+      {moviendo && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-foreground/40 backdrop-blur-sm px-5">
+          <div className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-xl border border-border bg-card p-5 shadow-card">
+            <h3 className="text-base font-semibold">Mover cita</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {moviendo.servicio?.nombre ?? "Servicio"} · actualmente {formatFechaHora(moviendo.fecha_hora).fecha} a las {formatFechaHora(moviendo.fecha_hora).hora}
+            </p>
+
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-sm font-medium">Nuevo día</span>
+              <input
+                type="date"
+                value={moverFecha}
+                min={hoyISO}
+                onChange={(e) => cargarMoverHoras(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </label>
+
+            {moverFecha && (
+              <div className="mt-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Nueva hora
+                </p>
+                {cargandoMoverHoras ? (
+                  <div className="flex justify-center py-6">
+                    <svg className="h-5 w-5 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  </div>
+                ) : moverHoras.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">No hay horas disponibles ese día.</p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {moverHoras.map(({ hora, ocupada }) => (
+                      <button
+                        key={hora}
+                        disabled={ocupada}
+                        onClick={() => setMoverHora(hora)}
+                        className={`rounded-lg border py-2 text-sm font-medium transition ${
+                          ocupada
+                            ? "cursor-not-allowed border-border bg-muted text-muted-foreground/40"
+                            : moverHora === hora
+                              ? "border-primary bg-accent text-accent-foreground"
+                              : "border-border bg-background text-foreground hover:border-ring/40"
+                        }`}
+                      >
+                        {hora}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => setMoviendo(null)}
+                className="flex-1 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarMover}
+                disabled={!moverHora || guardandoMover}
+                className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:opacity-90 disabled:opacity-50"
+              >
+                {guardandoMover ? "Moviendo..." : "Mover aquí"}
+              </button>
+            </div>
           </div>
         </div>
       )}

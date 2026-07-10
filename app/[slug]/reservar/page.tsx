@@ -118,6 +118,8 @@ export default function ReservarPage() {
         router.push(`/${slug}/login?redirect=/${slug}/reservar`);
         return;
       }
+
+      
       setUsuario({
         id: session.user.id,
         nombre: session.user.name ?? "",

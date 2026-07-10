@@ -96,19 +96,22 @@ useEffect(() => {
 }, [pestana, usuario]);
 
   useEffect(() => {
+    if (!barberia?.id) return; // espera a saber qué barbería es este slug
     async function cargarSesion() {
       const res = await fetch("/api/auth/session");
       const session = await res.json();
-      if (session?.user) {
+      if (session?.user && session.user.barberia_id === barberia!.id) {
         setUsuario({
           nombre: session.user.name ?? "",
           email: session.user.email ?? "",
           id: session.user.id,
         });
+      } else {
+        setUsuario(null); // sesión de otra barbería o sin sesión: no logueado aquí
       }
     }
     cargarSesion();
-  }, []);
+  }, [barberia?.id]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);

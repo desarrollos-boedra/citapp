@@ -123,7 +123,7 @@ export default function LoginPage() {
                     background: "none",
                     border: "none",
                     padding: 0,
-                    margin: 0,
+                    margin: 0, 
                     lineHeight: 0,
                     cursor: "pointer",
                   }}

@@ -109,7 +109,7 @@ useEffect(() => {
       } else {
         setUsuario(null); // sesión de otra barbería o sin sesión: no logueado aquí
       }
-    }
+     }
     cargarSesion();
   }, [barberia?.id]);
 

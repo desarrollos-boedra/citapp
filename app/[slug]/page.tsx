@@ -144,7 +144,7 @@ useEffect(() => {
   async function cancelarReserva(id: string) {
     setReservas((prev) => prev.map((r) => r.id === id ? { ...r, estado: "cancelada" } : r));
     setReservaACancelar(null);
-    await fetch("/api/cancelar-reserva", {
+    await fetch("/api/cancelar-reserva-cliente", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),

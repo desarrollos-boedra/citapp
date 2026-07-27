@@ -9,6 +9,7 @@ type Reserva = {
   estado: string;
   notas: string | null;
   servicio: { nombre: string; precio: number; duracion_min: number } | null;
+  usuario: { nombre: string; telefono: string | null } | null;
 };
 
 type Servicio = {
@@ -791,11 +792,24 @@ export default function AdminPage() {
                         <span>·</span>
                         <span>{hora}</span>
                       </div>
-                      {r.notas && (
+                      {(r.notas || r.usuario?.telefono) && (
                         <div className="mt-2.5 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                          {r.notas}
+                          <div className="flex items-center justify-between">
+                            {r.notas && <span>{r.notas}</span>}
+
+                            {r.usuario?.telefono && (
+                              <a
+                                href={`tel:${r.usuario.telefono}`}
+                                className="flex items-center gap-1.5 font-medium text-primary hover:underline"
+                              >
+                                📞 {r.usuario.telefono}
+                              </a>
+                            )}
+                          </div>
                         </div>
                       )}
+
+                      
                       {r.estado === "confirmada" && (
                         <div className="mt-3 flex gap-2">
                           <button

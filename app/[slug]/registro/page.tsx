@@ -117,14 +117,13 @@ export default function RegistroPage() {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-foreground">
-                Teléfono (opcional)
-              </span>
+              <span className="mb-1.5 block text-sm font-medium text-foreground">Teléfono</span>
               <input
                 type="tel"
                 placeholder="600 000 000"
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                required
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-soft outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
               />
             </label>

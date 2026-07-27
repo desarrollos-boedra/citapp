@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 export async function POST(request: Request) {
   const { nombre, email, telefono, password, barberia_id } = await request.json();
 
-  if (!nombre || !email || !password || !barberia_id) {
+  if (!nombre || !email || !password || !barberia_id || !telefono) {
     return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
   }
 

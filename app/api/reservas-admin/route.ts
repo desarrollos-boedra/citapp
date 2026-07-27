@@ -21,7 +21,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("reservas")
-    .select("id, fecha_hora, estado, notas, servicio:servicio_id(nombre, precio, duracion_min)")
+    .select("id, fecha_hora, estado, notas, servicio:servicio_id(nombre, precio, duracion_min), usuario:usuario_id(nombre, telefono)")
     .eq("barberia_id", barberiaId)
     .order("fecha_hora", { ascending: true });
 

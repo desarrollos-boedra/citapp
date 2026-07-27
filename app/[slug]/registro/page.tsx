@@ -138,8 +138,8 @@ export default function RegistroPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  style={{ paddingRight: "40px" }}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-soft outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+                  style={{ paddingRight: "40px", fontSize: "16px" }}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 shadow-soft outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
                 />
                 <button
                   type="button"

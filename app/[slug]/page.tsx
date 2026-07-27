@@ -10,6 +10,8 @@ type Barberia = {
   nombre: string;
   slug: string;
   telefono: string | null;
+  direccion: string | null;
+  maps_url: string | null;
 };
 
 type Servicio = {
@@ -259,15 +261,32 @@ return (
         <p className="mx-auto mt-5 max-w-md text-[15px] leading-relaxed text-muted-foreground">
           Reserva tu cita en segundos, sin llamadas ni esperas.
         </p>
+        <div className="mt-10 flex flex-col items-center gap-3">
         <button
           onClick={() => (usuario ? router.push(`/${slug}/reservar`) : setMostrarModal(true))}
-          className="group mt-10 inline-flex items-center gap-2 rounded-md bg-primary px-8 py-4 text-sm font-medium text-primary-foreground shadow-[0_8px_30px_-6px_oklch(0.40_0.16_222_/_0.45)] transition hover:-translate-y-1 hover:shadow-[0_14px_40px_-8px_oklch(0.40_0.16_222_/_0.55)]"
+          className="group inline-flex items-center gap-2 rounded-md bg-primary px-8 py-4 text-sm font-medium text-primary-foreground shadow-[0_8px_30px_-6px_oklch(0.40_0.16_222_/_0.45)] transition hover:-translate-y-1 hover:shadow-[0_14px_40px_-8px_oklch(0.40_0.16_222_/_0.55)]"
         >
           Reservar cita
-          <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-0.5">
+          <span
+            aria-hidden
+            className="transition-transform duration-200 group-hover:translate-x-0.5"
+          >
             →
           </span>
         </button>
+
+        <a
+          href={barberia.maps_url || "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-6 py-3 text-sm font-medium text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+        >
+          📍 {barberia.direccion ?? "Cómo llegar"}
+        </a>
+      </div>
+
+
+
       </section>
 
       {/* Servicios */}
